@@ -1,37 +1,32 @@
-FROM ubuntu:22.04
+FROM openjdk:11-jre-slim
 
-# Install required dependencies
+# Install dependencies:
+# - gettext-base for envsubst
+# - netcat-openbsd for seed checking
+# - procps for cassandra startup scripts
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    openjdk-11-jdk \
-    curl \
+    gettext-base \
+    netcat-openbsd \
     procps \
     python3 \
-    ca-certificates \
-    gettext-base \
     && rm -rf /var/lib/apt/lists/*
 
-# Create directory structure
-RUN mkdir -p /opt/hcd /var/lib/cassandra /var/log/cassandra \
-    && useradd -m -s /bin/bash cassandra \
-    && chown -R cassandra:cassandra /opt/hcd /var/lib/cassandra /var/log/cassandra
+# Create cassandra user and directories
+RUN groupadd -r cassandra && useradd -r -g cassandra cassandra
 
+# Assuming HCD is installed at /opt/hcd
+# (In a real scenario, we would ADD/COPY the tarball here)
 WORKDIR /opt/hcd
 
 # Copy configuration template and entrypoint script
 COPY config/cassandra.yaml.template /opt/hcd/conf/cassandra.yaml.template
 COPY scripts/docker-entrypoint.sh /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh
 
-# Ensure scripts are executable and owned by cassandra
-RUN chmod +x /docker-entrypoint.sh \
-    && chown cassandra:cassandra /docker-entrypoint.sh /opt/hcd/conf/cassandra.yaml.template
+# Ensure permissions for cassandra user
+RUN mkdir -p /var/lib/cassandra /var/log/cassandra && \
+    chown -R cassandra:cassandra /var/lib/cassandra /var/log/cassandra /opt/hcd
 
 USER cassandra
-
-# Expose required ports
-# 7000: intra-node communication
-# 7001: TLS intra-node communication
-# 7199: JMX
-# 9042: CQL
-EXPOSE 7000 7001 7199 9042
 
 ENTRYPOINT ["/docker-entrypoint.sh"]
