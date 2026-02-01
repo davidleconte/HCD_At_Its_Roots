@@ -50,4 +50,3 @@ cas_contention_timeout_in_ms: 1000
 truncate_timeout_in_ms: 60000
 request_timeout_in_ms: 10000
 cross_node_timeout: false
-endpoint_snitch: SimpleSnitch
