@@ -47,6 +47,13 @@ RUN for cmd in nodetool cqlsh hcd sstableloader sstabledump sstablemetadata; do 
         chmod +x /usr/local/bin/$cmd; \
     done
 
+# Download JMX Prometheus exporter (optional: for --profile monitoring)
+ARG JMX_EXPORTER_VERSION=0.20.0
+RUN curl -fsSL -o /opt/hcd/jmx_prometheus_javaagent.jar \
+    "https://repo1.maven.org/maven2/io/prometheus/jmx/jmx_prometheus_javaagent/${JMX_EXPORTER_VERSION}/jmx_prometheus_javaagent-${JMX_EXPORTER_VERSION}.jar" \
+    2>/dev/null || echo "JMX exporter download skipped (no internet). Monitoring profile will be unavailable."
+COPY config/jmx-exporter.yml /opt/hcd/jmx-exporter.yml
+
 WORKDIR /opt/hcd
 
 ENV CASSANDRA_CONF=/opt/hcd/resources/cassandra/conf

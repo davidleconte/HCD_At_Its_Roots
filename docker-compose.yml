@@ -22,6 +22,9 @@ x-shared-env: &shared-env
   CASSANDRA_SEEDS: 172.28.0.2,172.28.0.5
   CASSANDRA_RPC_ADDRESS: 0.0.0.0
   CASSANDRA_ENDPOINT_SNITCH: GossipingPropertyFileSnitch
+  # JMX Prometheus exporter (active only when jmx_prometheus_javaagent.jar exists)
+  JVM_EXTRA_OPTS: >-
+    -javaagent:/opt/hcd/jmx_prometheus_javaagent.jar=9404:/opt/hcd/jmx-exporter.yml
 
 services:
   # Datacenter 1
@@ -152,6 +155,46 @@ services:
     healthcheck:
       <<: *hcd-healthcheck
 
+  # ─── Observability Stack (optional: docker compose --profile monitoring up) ───
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    container_name: prometheus
+    profiles: ["monitoring"]
+    networks:
+      hcd-cluster:
+        ipv4_address: 172.28.0.20
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./config/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.retention.time=7d'
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:10.4.0
+    container_name: grafana
+    profiles: ["monitoring"]
+    networks:
+      hcd-cluster:
+        ipv4_address: 172.28.0.21
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+    volumes:
+      - ./config/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./config/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+
 networks:
   hcd-cluster:
     driver: bridge
@@ -166,3 +209,5 @@ volumes:
   hcd-node4-data:
   hcd-node5-data:
   hcd-node6-data:
+  prometheus-data:
+  grafana-data:

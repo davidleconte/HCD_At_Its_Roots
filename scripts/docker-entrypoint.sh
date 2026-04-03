@@ -104,6 +104,12 @@ else
     sleep $JITTER
 fi
 
+# Apply JVM_EXTRA_OPTS (e.g., JMX Prometheus exporter) if the agent JAR exists
+if [ -n "$JVM_EXTRA_OPTS" ] && [ -f /opt/hcd/jmx_prometheus_javaagent.jar ]; then
+    export JVM_OPTS="${JVM_OPTS:-} ${JVM_EXTRA_OPTS}"
+    echo "JMX exporter enabled on port 9404"
+fi
+
 echo "Starting HCD..."
 # Start HCD in foreground
 exec /opt/hcd/bin/hcd cassandra -f

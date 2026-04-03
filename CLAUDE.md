@@ -20,6 +20,9 @@ make cqlsh           # open CQL shell on node1
 make demo            # interactive entropy demo
 make demo-dry        # dry-run (no cluster needed)
 make demo-full       # build cluster + run full demo
+make demo-score      # validate all 54 modules (scorecard)
+make monitoring      # start Prometheus + Grafana (http://localhost:3000)
+make monitoring-down # stop Prometheus + Grafana
 make test            # run all pytest tests
 make wait            # wait until all nodes are UN
 
@@ -28,6 +31,7 @@ docker compose up -d --build
 docker exec hcd-node1 nodetool status
 ./scripts/demo-entropy.sh 3              # run specific module (0-53)
 ./scripts/demo-entropy.sh --dry-run      # dry-run mode
+./scripts/demo-entropy.sh --score        # automated 54-module scorecard
 
 # Generate topology for different cluster sizes
 python3 scripts/generate-topology.py -i                        # interactive
@@ -49,7 +53,10 @@ pytest tests/test_scripts.py             # script syntax + helper tests
 - **scripts/docker-entrypoint.sh** - Generates `cassandra.yaml` from template, writes rack/DC properties, waits for seed node with exponential backoff before starting HCD.
 - **Makefile** - Developer shortcuts with auto-detection of `docker compose` (v2) vs `docker-compose` (v1).
 - **scripts/generate-topology.py** - Generates `docker-compose.yml` and `.env` files for arbitrary cluster sizes and multi-DC configurations.
-- **scripts/demo-entropy.sh** - Interactive 54-module demo (modules 0-53) covering entropy, consistency, SAI indexing, vector search, CDC, audit logging, guardrails, data modeling, compaction strategies, compression, live DC expansion, backup/restore, rolling restart, repair strategies, stress testing, security, geographic visualization, DataStax driver policies, ACID vs Cassandra model, LOGGED/UNLOGGED batches, lost update problem, banking instant payments (LWT+CDC saga), supplier/customer order flow (saga pattern with compensating transactions), and a consistency decision framework. Supports `--dry-run` and `--no-pause` flags. Single-module execution (`./demo-entropy.sh 23`) auto-creates prerequisites via `ensure_rf_prod()`.
+- **scripts/demo-entropy.sh** - Interactive 54-module demo (modules 0-53) covering entropy, consistency, SAI indexing, vector search, CDC, audit logging, guardrails, data modeling, compaction strategies, compression, live DC expansion, backup/restore, rolling restart, repair strategies, stress testing, security (RBAC + TLS), geographic visualization, DataStax driver policies, ACID vs Cassandra model, LOGGED/UNLOGGED batches, lost update problem, banking instant payments (LWT+CDC saga), supplier/customer order flow (saga pattern with compensating transactions), and a consistency decision framework. Supports `--dry-run`, `--no-pause`, and `--score` flags. Module 0 includes a pre-assessment quiz. Progress counter `[N/53]` in every module header.
+- **config/prometheus.yml** - Prometheus scrape config for JMX exporter metrics on all 6 nodes (port 9404).
+- **config/jmx-exporter.yml** - JMX-to-Prometheus metric mapping for Cassandra thread pools, latencies, compaction, hints, and caches.
+- **config/grafana/** - Grafana provisioning (datasource + dashboard). Pre-built dashboard shows write/read p99, thread pool activity, compaction pending, dropped messages, and hints.
 - **scripts/driver-demo.py** - Python helper script using the DataStax cassandra-driver for modules 43-46. Subcommands: `token-aware`, `speculative`, `dc-failover`, `retry-policies`. Use `--local-dc` to override the default datacenter (default: `dc1`).
 
 ## Code Style

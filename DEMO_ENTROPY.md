@@ -31,8 +31,15 @@
     make demo                        # full interactive demo
     ./scripts/demo-entropy.sh 23     # jump to a specific module
     ./scripts/demo-entropy.sh --dry-run --no-pause  # dry-run, no cluster needed
+    ./scripts/demo-entropy.sh --score              # validate all 54 modules (scorecard)
     ```
     > **Single-module execution:** When jumping to Module N > 1, the script auto-creates the `rf_prod` keyspace via `ensure_rf_prod()` so prerequisites are satisfied.
+
+4.  **Optional: Live Metrics Dashboard**:
+    ```bash
+    make monitoring      # starts Prometheus + Grafana
+    ```
+    Open [http://localhost:3000](http://localhost:3000) (admin/admin) for live cluster dashboards showing thread pools, latency percentiles, compaction, and dropped messages. Modules 38-40 reference Grafana when it's running.
 
 ---
 
@@ -99,14 +106,14 @@ This demo uses a 6-node, multi-DC cluster simulated in Docker.
 |--------|-------|-----------|
 | 0 | Introduction & Cluster Status | 6-node topology verified |
 | 1 | Replication Factors | RF=1 vs RF=3 endpoint comparison |
-| 2 | Consistency Levels | EACH_QUORUM fails then recovers after node rejoin |
+| 2 | Consistency Levels | Active DN polling + EACH_QUORUM fails then recovers |
 | 3 | Node Failures | Interactive: "Will LOCAL_QUORUM succeed?" |
-| 4 | Hinted Handoff | Hints directory fills and drains |
+| 4 | Hinted Handoff | FIXED_ID query proves exact hint delivery |
 | 5 | Read Repair | Forced divergence (stop/write/restart) + digest repair |
 | 6 | Anti-Entropy Repair | Three-layer defense recap (HH/RR/Repair) |
-| 7 | Token Ring | 256 vnodes per node, ~16.7% ownership |
-| 8 | Write Path Trace | LOCAL_QUORUM mutation forwarding |
-| 9 | Read Path Trace | Digest vs full-data request |
+| 7 | Token Ring | 256 vnodes per node, trace version disclaimer |
+| 8 | Write Path Trace | LOCAL_QUORUM mutation forwarding, version-aware trace notes |
+| 9 | Read Path Trace | Digest vs full-data request, version-aware trace notes |
 | 10 | Node Recovery | Interactive question + hint replay verification |
 | 11 | Tombstones | Delete markers survive compaction until gc_grace |
 | 12 | Lightweight Transactions | Paxos IF NOT EXISTS prevents double-booking |
@@ -119,11 +126,11 @@ This demo uses a 6-node, multi-DC cluster simulated in Docker.
 | 15 | Schema Disagreement | Interactive question + describecluster + system.peers |
 | 16 | Gossip Protocol | HEARTBEAT, STATUS, DC/RACK live inspection |
 | 17 | Zombie Node (Network Partition) | Dynamic network name + interactive partition demo |
-| 18 | SAI (Storage Attached Indexing) | Composability: multi-index AND queries in trace |
-| 19 | JSON & Data API | Document patterns with schema enforcement |
+| 18 | SAI (Storage Attached Indexing) | Interactive Q + composable multi-index AND queries |
+| 19 | JSON & Data API | Interactive Q + DEFAULT UNSET partial updates |
 | 20 | Vector Search & AI Readiness | Compatibility guard + ANN similarity with fallback |
-| 21 | Mixed Real-time Operations | INSERT = UPDATE = mutation (no read-before-write) |
-| 22 | Compaction | SSTable merge resolves physical entropy |
+| 21 | Mixed Real-time Operations | Interactive Q + INSERT = UPDATE = mutation (LWW) |
+| 22 | Compaction | Interactive Q + SSTable merge resolves physical entropy |
 | 23 | Kill an Entire Datacenter (~5-8 min) | Zero data loss, LOCAL_QUORUM from dc2 |
 | 24 | Grand Finale | Three cascading failures, full self-healing |
 
@@ -131,33 +138,33 @@ This demo uses a 6-node, multi-DC cluster simulated in Docker.
 | Module | Title | Key Proof |
 |--------|-------|-----------|
 | 25 | CDC (Change Data Capture) | `strings` on raw CDC segments proves capture |
-| 26 | Audit Logging | cassandra.yaml pre-check, multi-dir log search |
-| 27 | Guardrails | Batch size warning/failure thresholds |
-| 28 | Data Modeling Anti-Patterns | 200 rows: hot partition vs bucketed design |
+| 26 | Audit Logging | Interactive Q + cassandra.yaml pre-check, multi-dir log search |
+| 27 | Guardrails | Interactive Q + batch size warning/failure thresholds |
+| 28 | Data Modeling Anti-Patterns | Interactive Q + 200 rows: hot partition vs bucketed |
 | 29 | Latency Comparison | Side-by-side: CL=ONE vs LQ vs EQ extraction |
 | 30 | Time-Series Data Modeling | Compound keys, TTL, windowed queries |
-| 31 | Compaction Deep Dive | 4 strategies (STCS/LCS/TWCS/UCS) compared |
-| 32 | Compression Strategies | LZ4/Zstd/Snappy — production: 1TB -> 400-600GB |
+| 31 | Compaction Deep Dive | Interactive Q + 4 strategies (STCS/LCS/TWCS/UCS) |
+| 32 | Compression Strategies | Interactive Q + LZ4/Zstd/Snappy comparison |
 | 33 | Live Failover Under Load (~5 min) | 50 rows survive mid-stream node kill |
 | 34 | Multi-DC Write Conflict | Two strategies: parallel + USING TIMESTAMP |
-| 35 | Adding a Datacenter Live | rebuild + ownership verification |
-| 36 | Backup & Restore | Snapshot, truncate, restore, refresh |
+| 35 | Adding a Datacenter Live | Interactive Q + rebuild + ownership verification |
+| 36 | Backup & Restore | Interactive Q + snapshot, truncate, restore, refresh |
 | 37 | Rolling Restart (~8-10 min) | All 3 nodes restarted (seed last), 20 writes succeed |
 
 #### Part 4 — Performance (Modules 38-42)
 | Module | Title | Key Proof |
 |--------|-------|-----------|
-| 38 | Rate Limiting & Thread Pools | tpstats: pending=0, blocked=0 |
-| 39 | Repair Strategies | Full vs primary-range vs incremental |
+| 38 | Rate Limiting & Thread Pools | Grafana link + 500 parallel inserts move tpstats |
+| 39 | Repair Strategies | Interactive Q + pause/write/unpause creates real entropy |
 | 40 | Stress Testing | 200 rows, bloom filter stats, latency histogram |
-| 41 | Security & Access Control | RBAC: readonly user blocked on INSERT |
+| 41 | Security & Access Control | Syntax-only banner, RBAC + TLS keytool demo |
 | 42 | Geographic Visualization | LOCAL_QUORUM trace: zero WAN hops |
 
 #### Part 5 — Driver Policies (Modules 43-47)
 | Module | Title | Key Proof |
 |--------|-------|-----------|
 | 43 | Driver Policies | TokenAwarePolicy: coordinator IS the replica |
-| 44 | Speculative Execution | p99 drops to ~p50 with backup requests |
+| 44 | Speculative Execution | Interactive Q + p99 drops to ~p50 with backup requests |
 | 45 | Live DC Failover with Driver (~3-5 min) | Zero application errors during DC kill |
 | 46 | Retry Policies Under Partition | pause+disconnect dual failure, 3 policies compared |
 | 47 | Demo Summary Dashboard | Visual recap of all 54 modules |

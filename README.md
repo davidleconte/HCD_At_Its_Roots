@@ -55,6 +55,9 @@ Run `make help` for all targets. Key shortcuts:
 | `make cqlsh` | Open CQL shell on node1 |
 | `make demo` | Run the interactive entropy demo |
 | `make demo-dry` | Dry-run demo (no cluster needed) |
+| `make demo-score` | Validate all 54 modules (scorecard) |
+| `make monitoring` | Start Prometheus + Grafana (http://localhost:3000) |
+| `make monitoring-down` | Stop Prometheus + Grafana |
 | `make test` | Run all pytest tests |
 | `make wait` | Wait until all nodes are Up/Normal |
 

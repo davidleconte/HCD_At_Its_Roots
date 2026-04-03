@@ -1,0 +1,53 @@
+# JMX Exporter configuration for Cassandra/HCD metrics
+# Exposes key metrics for Prometheus on port 9404
+
+lowercaseOutputName: true
+lowercaseOutputLabelNames: true
+
+rules:
+  # Thread pool metrics (modules 38-40)
+  - pattern: 'org.apache.cassandra.metrics<type=ThreadPools, path=request, scope=(.*), name=(.*)><>Value'
+    name: cassandra_threadpool_request_$2
+    labels:
+      pool: $1
+
+  # Client request latencies
+  - pattern: 'org.apache.cassandra.metrics<type=ClientRequest, scope=(.*), name=(.*)><>(\w+)'
+    name: cassandra_client_request_$2_$3
+    labels:
+      scope: $1
+
+  # Table-level metrics
+  - pattern: 'org.apache.cassandra.metrics<type=Table, keyspace=(.*), scope=(.*), name=(.*)><>Value'
+    name: cassandra_table_$3
+    labels:
+      keyspace: $1
+      table: $2
+
+  # Compaction metrics
+  - pattern: 'org.apache.cassandra.metrics<type=Compaction, name=(.*)><>Value'
+    name: cassandra_compaction_$1
+
+  # Storage metrics
+  - pattern: 'org.apache.cassandra.metrics<type=Storage, name=(.*)><>Count'
+    name: cassandra_storage_$1
+
+  # Commit log metrics
+  - pattern: 'org.apache.cassandra.metrics<type=CommitLog, name=(.*)><>Value'
+    name: cassandra_commitlog_$1
+
+  # Dropped messages
+  - pattern: 'org.apache.cassandra.metrics<type=DroppedMessage, scope=(.*), name=(.*)><>Count'
+    name: cassandra_dropped_$2
+    labels:
+      message_type: $1
+
+  # Hinted handoff
+  - pattern: 'org.apache.cassandra.metrics<type=HintedHandOffManager, name=(.*)><>Count'
+    name: cassandra_hints_$1
+
+  # Cache metrics
+  - pattern: 'org.apache.cassandra.metrics<type=Cache, scope=(.*), name=(.*)><>Value'
+    name: cassandra_cache_$2
+    labels:
+      cache: $1
