@@ -20,7 +20,9 @@ make cqlsh           # open CQL shell on node1
 make demo            # interactive entropy demo
 make demo-dry        # dry-run (no cluster needed)
 make demo-full       # build cluster + run full demo
-make demo-score      # validate all 54 modules (scorecard)
+make demo-score      # validate all 62 modules (scorecard)
+make api             # start Data API (http://localhost:8181)
+make api-down        # stop Data API
 make monitoring      # start Prometheus + Grafana (http://localhost:3000)
 make monitoring-down # stop Prometheus + Grafana
 make test            # run all pytest tests
@@ -29,9 +31,9 @@ make wait            # wait until all nodes are UN
 # Direct commands (equivalent)
 docker compose up -d --build
 docker exec hcd-node1 nodetool status
-./scripts/demo-entropy.sh 3              # run specific module (0-53)
+./scripts/demo-entropy.sh 3              # run specific module (0-61)
 ./scripts/demo-entropy.sh --dry-run      # dry-run mode
-./scripts/demo-entropy.sh --score        # automated 54-module scorecard
+./scripts/demo-entropy.sh --score        # automated 62-module scorecard
 
 # Generate topology for different cluster sizes
 python3 scripts/generate-topology.py -i                        # interactive
@@ -53,7 +55,7 @@ pytest tests/test_scripts.py             # script syntax + helper tests
 - **scripts/docker-entrypoint.sh** - Generates `cassandra.yaml` from template, writes rack/DC properties, waits for seed node with exponential backoff before starting HCD.
 - **Makefile** - Developer shortcuts with auto-detection of `docker compose` (v2) vs `docker-compose` (v1).
 - **scripts/generate-topology.py** - Generates `docker-compose.yml` and `.env` files for arbitrary cluster sizes and multi-DC configurations.
-- **scripts/demo-entropy.sh** - Interactive 54-module demo (modules 0-53) covering entropy, consistency, SAI indexing, vector search (with RAG pipeline architecture), CDC (with Kafka/Debezium integration), audit logging, guardrails, data modeling (with multi-tenancy patterns), compaction strategies, compression, live DC expansion (with chaos test: rebuild + cross-DC node failures), backup/restore, rolling restart, repair strategies (with Reaper scheduling), stress testing, security (RBAC + TLS), geographic visualization (with GDPR data sovereignty), DataStax driver policies, ACID vs Cassandra model, LOGGED/UNLOGGED batches, lost update problem, banking instant payments (LWT+CDC saga, SOX/PCI-DSS/PSD2 compliance), supplier/customer order flow (saga pattern with compensating transactions), and a consistency decision framework with evidence-based positioning. Enterprise coverage includes HCD vs Apache Cassandra differentiation, RPO/RTO business metrics, multi-cloud/hybrid cloud mapping, zero-downtime schema evolution, and WAN latency simulation (tc netem). Supports `--dry-run`, `--no-pause`, and `--score` flags. Module 0 includes a pre-assessment quiz. Progress counter `[N/53]` in every module header.
+- **scripts/demo-entropy.sh** - Interactive 62-module demo (modules 0-61) in 7 parts. Parts 1-6 cover entropy, consistency, SAI, vector search, CDC, audit logging, guardrails, data modeling, compaction, compression, DC expansion (with chaos test), backup/restore, rolling restart, repair, stress testing, security (RBAC + TLS), GDPR data sovereignty, driver policies, ACID model, batches, LWT, sagas, and consistency decision framework. Part 7 (Enterprise, modules 54-61) adds: HCD Data API (REST/JSON via HTTP), multi-tenant isolation (end-to-end), node decommission, disaster recovery runbook, silent data corruption detection, cross-service saga (outbox pattern), LWT contention under load, and repair deep-dive (Merkle trees, gc_grace zombie rows). Supports `--dry-run`, `--no-pause`, and `--score` flags. Progress counter `[N/61]` in every module header.
 - **config/prometheus.yml** - Prometheus scrape config for JMX exporter metrics on all 6 nodes (port 9404).
 - **config/jmx-exporter.yml** - JMX-to-Prometheus metric mapping for Cassandra thread pools, latencies, compaction, hints, and caches.
 - **config/grafana/** - Grafana provisioning (datasource + dashboard). Pre-built dashboard shows write/read p99, thread pool activity, compaction pending, dropped messages, and hints.

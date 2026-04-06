@@ -4,7 +4,7 @@
 COMPOSE := $(shell docker compose version >/dev/null 2>&1 && echo "docker compose" || echo "docker-compose")
 EXPECTED_NODES ?= 6
 
-.PHONY: help build up down restart status logs cqlsh demo demo-dry demo-score test clean monitoring monitoring-down
+.PHONY: help build up down restart status logs cqlsh demo demo-dry demo-score test clean monitoring monitoring-down api api-down
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -44,8 +44,14 @@ demo-dry: ## Run the demo in dry-run mode (no cluster needed)
 demo-full: ## Build cluster + run full automated demo
 	./scripts/execute-full-demo.sh
 
-demo-score: ## Validate all 54 modules (dry-run scorecard)
+demo-score: ## Validate all 62 modules (dry-run scorecard)
 	./scripts/demo-entropy.sh --score
+
+api: ## Start Data API (http://localhost:8181)
+	$(COMPOSE) --profile api up -d
+
+api-down: ## Stop Data API
+	$(COMPOSE) --profile api down
 
 monitoring: ## Start Prometheus + Grafana (http://localhost:3000)
 	$(COMPOSE) --profile monitoring up -d

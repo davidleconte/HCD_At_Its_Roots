@@ -16,8 +16,8 @@ def test_dry_run_execution():
     result = run_demo("--dry-run", "--no-pause")
     assert result.returncode == 0, f"Script failed with stderr: {result.stderr}"
     assert "[DRY-RUN]" in result.stdout
-    # Verify all 54 module headers appear
-    for i in range(54):
+    # Verify all 62 module headers appear
+    for i in range(62):
         assert f"Module {i}:" in result.stdout, f"Module {i} header missing from full run"
 
 
@@ -32,19 +32,19 @@ def test_invalid_module():
     """Verify the script handles invalid module numbers gracefully."""
     result = run_demo("--dry-run", "99")
     assert "Invalid module number" in result.stdout
-    assert "Valid: 0-53" in result.stdout
+    assert "Valid: 0-61" in result.stdout
 
 
 def test_boundary_module_valid():
-    """Verify module 53 is accepted."""
-    result = run_demo("--dry-run", "--no-pause", "53")
+    """Verify module 61 is accepted."""
+    result = run_demo("--dry-run", "--no-pause", "61")
     assert result.returncode == 0
-    assert "Module 53:" in result.stdout
+    assert "Module 61:" in result.stdout
 
 
 def test_boundary_module_invalid():
-    """Verify module 54 is rejected."""
-    result = run_demo("--dry-run", "54")
+    """Verify module 62 is rejected."""
+    result = run_demo("--dry-run", "62")
     assert "Invalid module number" in result.stdout
 
 
@@ -281,7 +281,7 @@ def test_module_53_decision_framework():
         "Module 53 should reference the decision framework"
 
 
-@pytest.mark.parametrize("module_id", [str(i) for i in range(54)])
+@pytest.mark.parametrize("module_id", [str(i) for i in range(62)])
 def test_individual_modules_dry(module_id):
     """Verify each individual module runs in dry-run mode."""
     result = run_demo("--dry-run", "--no-pause", module_id)

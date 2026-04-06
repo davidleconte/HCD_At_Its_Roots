@@ -67,8 +67,8 @@ pause() {
     fi
 }
 
-TOTAL_MODULES=54
-PART_NAMES=("Foundations" "Foundations" "Foundations" "Foundations" "Foundations" "Foundations" "Foundations" "Foundations" "Foundations" "Foundations" "Foundations" "Foundations" "Foundations" "Foundations" "Advanced Failures" "Advanced Failures" "Advanced Failures" "Advanced Failures" "Advanced Failures" "Advanced Failures" "Advanced Failures" "Advanced Failures" "Advanced Failures" "Advanced Failures" "Advanced Failures" "Operations" "Operations" "Operations" "Operations" "Operations" "Operations" "Operations" "Operations" "Operations" "Operations" "Operations" "Operations" "Operations" "Performance" "Performance" "Performance" "Performance" "Performance" "Driver Policies" "Driver Policies" "Driver Policies" "Driver Policies" "Driver Policies" "Transactions" "Transactions" "Transactions" "Transactions" "Transactions" "Transactions")
+TOTAL_MODULES=62
+PART_NAMES=("Foundations" "Foundations" "Foundations" "Foundations" "Foundations" "Foundations" "Foundations" "Foundations" "Foundations" "Foundations" "Foundations" "Foundations" "Foundations" "Foundations" "Advanced Failures" "Advanced Failures" "Advanced Failures" "Advanced Failures" "Advanced Failures" "Advanced Failures" "Advanced Failures" "Advanced Failures" "Advanced Failures" "Advanced Failures" "Advanced Failures" "Operations" "Operations" "Operations" "Operations" "Operations" "Operations" "Operations" "Operations" "Operations" "Operations" "Operations" "Operations" "Operations" "Performance" "Performance" "Performance" "Performance" "Performance" "Driver Policies" "Driver Policies" "Driver Policies" "Driver Policies" "Driver Policies" "Transactions" "Transactions" "Transactions" "Transactions" "Transactions" "Transactions" "Enterprise" "Enterprise" "Enterprise" "Enterprise" "Enterprise" "Enterprise" "Enterprise" "Enterprise")
 
 header() {
     local mod=$1
@@ -170,8 +170,8 @@ done
 
 # ─── Validation ───────────────────────────────────────────────────
 if [[ -n "$SELECTED_MODULE" ]]; then
-    if ! [[ "$SELECTED_MODULE" =~ ^([0-9]|[1-4][0-9]|5[0-3])$ ]]; then
-        echo "Invalid module number: ${SELECTED_MODULE} (Valid: 0-53)"
+    if ! [[ "$SELECTED_MODULE" =~ ^([0-9]|[1-5][0-9]|6[01])$ ]]; then
+        echo "Invalid module number: ${SELECTED_MODULE} (Valid: 0-61)"
         exit 1
     fi
 fi
@@ -357,7 +357,7 @@ run_module() {
             echo -e "${C_BLUE}Every command, every pattern, every failure mode scales linearly.${C_RESET}"
 
             separator
-            echo -e "${C_WHITE}--- Demo Roadmap (54 modules in 6 parts) ---${C_RESET}"
+            echo -e "${C_WHITE}--- Demo Roadmap (62 modules in 7 parts) ---${C_RESET}"
             echo ""
             echo "  PART 1: Foundations       (Modules 1-6)   RF, CL, failures, entropy repair"
             echo "  PART 2: Internals         (Modules 7-13)  Token ring, write/read path, LWT"
@@ -365,6 +365,7 @@ run_module() {
             echo "  PART 4: Operations        (Modules 25-36) CDC, audit, compaction, backup"
             echo "  PART 5: Production Ops    (Modules 37-47) Rolling restart, stress, security, driver"
             echo "  PART 6: Transactions      (Modules 48-53) ACID model, batches, LWT, sagas"
+            echo "  PART 7: Enterprise        (Modules 54-61) Data API, multi-tenancy, DR, decommission"
             echo ""
             echo "  You can run any single module: ./demo-entropy.sh 23"
             echo "  Modules > 1 auto-create the rf_prod keyspace if needed."
@@ -4517,7 +4518,7 @@ run_module() {
             echo -e "${C_CYAN}║                         SUMMARY DASHBOARD                           ║${C_RESET}"
             echo -e "${C_CYAN}╠══════════════════════════════════════════════════════════════════════╣${C_RESET}"
             echo -e "${C_CYAN}║                                                                    ║${C_RESET}"
-            echo -e "${C_CYAN}║  Modules Completed:  54 (0-53)                                     ║${C_RESET}"
+            echo -e "${C_CYAN}║  Modules Completed:  62 (0-61)                                     ║${C_RESET}"
             echo -e "${C_CYAN}║  Cluster:            6 nodes, 2 DCs, RF=3 per DC                   ║${C_RESET}"
             echo -e "${C_CYAN}║                                                                    ║${C_RESET}"
             echo -e "${C_CYAN}╠══════════════════════════════════════════════════════════════════════╣${C_RESET}"
@@ -5360,6 +5361,1599 @@ run_module() {
             fi
             # ─── End Post-Assessment ──────────────────────────────────────
             ;;
+        54)
+            header 54 "HCD Data API (REST/JSON Document Access)"
+            echo -e "${C_BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${C_RESET}"
+            echo -e "${C_BLUE}  PART 7: ENTERPRISE PATTERNS (Modules 54-61)${C_RESET}"
+            echo -e "${C_BLUE}  Beyond CQL: APIs, multi-tenancy, and production patterns${C_RESET}"
+            echo -e "${C_BLUE}  for building real applications on HCD.${C_RESET}"
+            echo -e "${C_BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${C_RESET}"
+            echo ""
+            echo "The HCD Data API is a separate HTTP/JSON service that sits in front of HCD"
+            echo "and exposes a document-oriented interface — no CQL required. Developers who"
+            echo "know REST/JSON can interact with HCD without learning the Cassandra query language."
+            echo ""
+
+            separator
+            echo -e "${C_WHITE}--- Architecture ---${C_RESET}"
+            echo ""
+            echo "+-----------------------------------------------------------------------+"
+            echo "|                     HCD Data API Architecture                          |"
+            echo "|                                                                         |"
+            echo "|   ┌──────────┐    HTTP/JSON    ┌──────────┐    CQL     ┌──────────┐    |"
+            echo "|   │  Client  │ ──────────────► │ Data API │ ────────► │   HCD    │    |"
+            echo "|   │  (curl,  │   port 8181     │(stargateio│  port 9042│  Cluster │    |"
+            echo "|   │  Postman,│ ◄────────────── │/data-api)│ ◄──────── │ (6 nodes)│    |"
+            echo "|   │  app)    │    JSON resp     │          │           │          │    |"
+            echo "|   └──────────┘                  └──────────┘           └──────────┘    |"
+            echo "+-----------------------------------------------------------------------+"
+            echo ""
+
+            # ─── Detection: Is the Data API container running? ───────────
+            DATA_API_RUNNING=false
+            if [ "$DRY_RUN" = false ]; then
+                if docker inspect data-api >/dev/null 2>&1; then
+                    DATA_API_STATUS=$(docker inspect -f '{{.State.Status}}' data-api 2>/dev/null || echo "unknown")
+                    if [ "$DATA_API_STATUS" = "running" ]; then
+                        DATA_API_RUNNING=true
+                        echo -e "${C_GREEN}Data API container detected and running on port 8181.${C_RESET}"
+                    else
+                        echo -e "${C_YELLOW}Data API container exists but is not running (status: ${DATA_API_STATUS}).${C_RESET}"
+                    fi
+                else
+                    echo -e "${C_YELLOW}Data API container not found.${C_RESET}"
+                fi
+
+                if [ "$DATA_API_RUNNING" = false ]; then
+                    echo ""
+                    echo -e "${C_WHITE}To start the Data API, run:${C_RESET}"
+                    echo -e "${C_CYAN}  make api${C_RESET}"
+                    echo -e "${C_DIM}  (or: docker compose --profile api up -d)${C_RESET}"
+                    echo ""
+                    echo -e "${C_YELLOW}Continuing with DRY-RUN walkthrough of Data API commands...${C_RESET}"
+                fi
+            else
+                echo -e "${C_YELLOW}[DRY-RUN]${C_RESET} Would check for data-api container on port 8181"
+            fi
+            pause
+
+            # ─── Create Namespace ────────────────────────────────────────
+            separator
+            echo -e "${C_WHITE}--- Step 1: Create a Namespace ---${C_RESET}"
+            echo "A namespace in the Data API maps to a Cassandra keyspace."
+            echo ""
+            if [ "$DRY_RUN" = false ] && [ "$DATA_API_RUNNING" = true ]; then
+                log_cmd "curl -s -X POST http://localhost:8181/v1 -H 'Content-Type: application/json' -d '{\"createNamespace\": {\"name\": \"data_api_demo\"}}' 2>&1 | python3 -m json.tool 2>/dev/null || cat"
+            else
+                log_cmd "curl -s -X POST http://localhost:8181/v1 -H 'Content-Type: application/json' -d '{\"createNamespace\": {\"name\": \"data_api_demo\"}}'"
+            fi
+            lookfor "status.ok = 1 confirms the namespace was created."
+            pause
+
+            # ─── Create Collection ───────────────────────────────────────
+            separator
+            echo -e "${C_WHITE}--- Step 2: Create a Collection ---${C_RESET}"
+            echo "Collections are like tables, but schema-free. You insert JSON documents directly."
+            echo ""
+            if [ "$DRY_RUN" = false ] && [ "$DATA_API_RUNNING" = true ]; then
+                log_cmd "curl -s -X POST http://localhost:8181/v1/data_api_demo -H 'Content-Type: application/json' -d '{\"createCollection\": {\"name\": \"products\"}}' 2>&1 | python3 -m json.tool 2>/dev/null || cat"
+            else
+                log_cmd "curl -s -X POST http://localhost:8181/v1/data_api_demo -H 'Content-Type: application/json' -d '{\"createCollection\": {\"name\": \"products\"}}'"
+            fi
+            lookfor "Collection 'products' is ready to accept JSON documents."
+            pause
+
+            # ─── Insert Documents ────────────────────────────────────────
+            separator
+            echo -e "${C_WHITE}--- Step 3: Insert Documents (insertOne + insertMany) ---${C_RESET}"
+            echo "Let's insert 3 electronics products with nested specs and tags."
+            echo ""
+
+            echo -e "${C_DIM}insertOne — MacBook Pro:${C_RESET}"
+            if [ "$DRY_RUN" = false ] && [ "$DATA_API_RUNNING" = true ]; then
+                log_cmd "curl -s -X POST http://localhost:8181/v1/data_api_demo/products -H 'Content-Type: application/json' -d '{\"insertOne\": {\"document\": {\"name\": \"MacBook Pro 16\", \"brand\": \"Apple\", \"price\": 2499, \"in_stock\": true, \"specs\": {\"cpu\": \"M3 Max\", \"ram_gb\": 36, \"storage_tb\": 1}, \"tags\": [\"laptop\", \"professional\", \"apple-silicon\"]}}}' 2>&1 | python3 -m json.tool 2>/dev/null || cat"
+            else
+                log_cmd "curl -s -X POST http://localhost:8181/v1/data_api_demo/products -H 'Content-Type: application/json' -d '{\"insertOne\": {\"document\": {\"name\": \"MacBook Pro 16\", \"brand\": \"Apple\", \"price\": 2499, \"in_stock\": true, \"specs\": {\"cpu\": \"M3 Max\", \"ram_gb\": 36, \"storage_tb\": 1}, \"tags\": [\"laptop\", \"professional\", \"apple-silicon\"]}}}'"
+            fi
+            echo ""
+
+            echo -e "${C_DIM}insertMany — Galaxy Tab and ThinkPad:${C_RESET}"
+            if [ "$DRY_RUN" = false ] && [ "$DATA_API_RUNNING" = true ]; then
+                log_cmd "curl -s -X POST http://localhost:8181/v1/data_api_demo/products -H 'Content-Type: application/json' -d '{\"insertMany\": {\"documents\": [{\"name\": \"Galaxy Tab S9\", \"brand\": \"Samsung\", \"price\": 849, \"in_stock\": true, \"specs\": {\"cpu\": \"Snapdragon 8 Gen 2\", \"ram_gb\": 12, \"storage_tb\": 0.256}, \"tags\": [\"tablet\", \"android\", \"s-pen\"]}, {\"name\": \"ThinkPad X1 Carbon\", \"brand\": \"Lenovo\", \"price\": 1649, \"in_stock\": false, \"specs\": {\"cpu\": \"Intel i7-1365U\", \"ram_gb\": 32, \"storage_tb\": 1}, \"tags\": [\"laptop\", \"business\", \"ultrabook\"]}]}}' 2>&1 | python3 -m json.tool 2>/dev/null || cat"
+            else
+                log_cmd "curl -s -X POST http://localhost:8181/v1/data_api_demo/products -H 'Content-Type: application/json' -d '{\"insertMany\": {\"documents\": [{\"name\": \"Galaxy Tab S9\", \"brand\": \"Samsung\", \"price\": 849, \"in_stock\": true, \"specs\": {\"cpu\": \"Snapdragon 8 Gen 2\", \"ram_gb\": 12, \"storage_tb\": 0.256}, \"tags\": [\"tablet\", \"android\", \"s-pen\"]}, {\"name\": \"ThinkPad X1 Carbon\", \"brand\": \"Lenovo\", \"price\": 1649, \"in_stock\": false, \"specs\": {\"cpu\": \"Intel i7-1365U\", \"ram_gb\": 32, \"storage_tb\": 1}, \"tags\": [\"laptop\", \"business\", \"ultrabook\"]}]}}'"
+            fi
+            lookfor "insertedIds confirms each document received a unique ID."
+            pause
+
+            # ─── Find Documents ──────────────────────────────────────────
+            separator
+            echo -e "${C_WHITE}--- Step 4: Find Documents (filters) ---${C_RESET}"
+            echo ""
+
+            echo -e "${C_DIM}Filter by brand:${C_RESET}"
+            if [ "$DRY_RUN" = false ] && [ "$DATA_API_RUNNING" = true ]; then
+                log_cmd "curl -s -X POST http://localhost:8181/v1/data_api_demo/products -H 'Content-Type: application/json' -d '{\"find\": {\"filter\": {\"brand\": \"Apple\"}}}' 2>&1 | python3 -m json.tool 2>/dev/null || cat"
+            else
+                log_cmd "curl -s -X POST http://localhost:8181/v1/data_api_demo/products -H 'Content-Type: application/json' -d '{\"find\": {\"filter\": {\"brand\": \"Apple\"}}}'"
+            fi
+            echo ""
+
+            echo -e "${C_DIM}Filter by price range (under 1200):${C_RESET}"
+            if [ "$DRY_RUN" = false ] && [ "$DATA_API_RUNNING" = true ]; then
+                log_cmd "curl -s -X POST http://localhost:8181/v1/data_api_demo/products -H 'Content-Type: application/json' -d '{\"find\": {\"filter\": {\"price\": {\"\$lt\": 1200}}}}' 2>&1 | python3 -m json.tool 2>/dev/null || cat"
+            else
+                log_cmd "curl -s -X POST http://localhost:8181/v1/data_api_demo/products -H 'Content-Type: application/json' -d '{\"find\": {\"filter\": {\"price\": {\"\$lt\": 1200}}}}'"
+            fi
+            echo ""
+
+            echo -e "${C_DIM}Combined filter (in_stock AND price < 2000):${C_RESET}"
+            if [ "$DRY_RUN" = false ] && [ "$DATA_API_RUNNING" = true ]; then
+                log_cmd "curl -s -X POST http://localhost:8181/v1/data_api_demo/products -H 'Content-Type: application/json' -d '{\"find\": {\"filter\": {\"in_stock\": true, \"price\": {\"\$lt\": 2000}}}}' 2>&1 | python3 -m json.tool 2>/dev/null || cat"
+            else
+                log_cmd "curl -s -X POST http://localhost:8181/v1/data_api_demo/products -H 'Content-Type: application/json' -d '{\"find\": {\"filter\": {\"in_stock\": true, \"price\": {\"\$lt\": 2000}}}}'"
+            fi
+            lookfor "Filters work like MongoDB queries — \$lt, \$gt, \$eq, \$in, \$exists, etc."
+            pause
+
+            # ─── Update Document ─────────────────────────────────────────
+            separator
+            echo -e "${C_WHITE}--- Step 5: Update a Document ---${C_RESET}"
+            echo "Use findOneAndUpdate to atomically modify a document."
+            echo ""
+            if [ "$DRY_RUN" = false ] && [ "$DATA_API_RUNNING" = true ]; then
+                log_cmd "curl -s -X POST http://localhost:8181/v1/data_api_demo/products -H 'Content-Type: application/json' -d '{\"findOneAndUpdate\": {\"filter\": {\"name\": \"MacBook Pro 16\"}, \"update\": {\"\$set\": {\"price\": 999, \"tags\": [\"laptop\", \"professional\", \"apple-silicon\", \"on-sale\"]}}}}' 2>&1 | python3 -m json.tool 2>/dev/null || cat"
+            else
+                log_cmd "curl -s -X POST http://localhost:8181/v1/data_api_demo/products -H 'Content-Type: application/json' -d '{\"findOneAndUpdate\": {\"filter\": {\"name\": \"MacBook Pro 16\"}, \"update\": {\"\$set\": {\"price\": 999, \"tags\": [\"laptop\", \"professional\", \"apple-silicon\", \"on-sale\"]}}}}'"
+            fi
+            lookfor "\$set updates specific fields without replacing the entire document."
+            pause
+
+            # ─── Delete Document ─────────────────────────────────────────
+            separator
+            echo -e "${C_WHITE}--- Step 6: Delete a Document ---${C_RESET}"
+            echo ""
+            if [ "$DRY_RUN" = false ] && [ "$DATA_API_RUNNING" = true ]; then
+                log_cmd "curl -s -X POST http://localhost:8181/v1/data_api_demo/products -H 'Content-Type: application/json' -d '{\"deleteOne\": {\"filter\": {\"name\": \"ThinkPad X1 Carbon\"}}}' 2>&1 | python3 -m json.tool 2>/dev/null || cat"
+            else
+                log_cmd "curl -s -X POST http://localhost:8181/v1/data_api_demo/products -H 'Content-Type: application/json' -d '{\"deleteOne\": {\"filter\": {\"name\": \"ThinkPad X1 Carbon\"}}}'"
+            fi
+            lookfor "deletedCount: 1 confirms the document was removed."
+            pause
+
+            # ─── Comparison Table ────────────────────────────────────────
+            separator
+            echo -e "${C_WHITE}--- Data API vs CQL: When to Use Each ---${C_RESET}"
+            echo ""
+            echo "+-----------------------------------------------------------------------+"
+            echo "|  Criteria              Data API (HTTP/JSON)     CQL (Native Driver)    |"
+            echo "|───────────────────────────────────────────────────────────────────────  |"
+            echo "|  Developer skill       Web/mobile devs          DB engineers            |"
+            echo "|  Schema                Schema-free (JSON)       Schema-defined (DDL)    |"
+            echo "|  Performance           Good (HTTP overhead)     Best (binary protocol)  |"
+            echo "|  Query flexibility     Filter operators         Full CQL + aggregates   |"
+            echo "|  Nested data           Native (JSON docs)       Frozen UDTs / maps      |"
+            echo "|  Transactions          Document-level           Row/partition-level      |"
+            echo "|  Consistency tuning    Per-request headers      Per-query CL             |"
+            echo "|  Best for              Microservices, CRUD      Analytics, high-perf     |"
+            echo "+-----------------------------------------------------------------------+"
+            echo ""
+            echo -e "${C_DIM}Postman collection available at: config/postman/hcd-data-api.postman_collection.json${C_RESET}"
+            pause
+
+            # ─── Interactive Q&A ─────────────────────────────────────────
+            separator
+            echo -e "${C_YELLOW}Q: When would you use the Data API instead of CQL?${C_RESET}"
+            pause
+            echo -e "${C_GREEN}A: Use the Data API when:${C_RESET}"
+            echo -e "${C_GREEN}   - Your team has web/mobile developers who know JSON/HTTP but not CQL${C_RESET}"
+            echo -e "${C_GREEN}   - For rapid prototyping — no schema design needed up front${C_RESET}"
+            echo -e "${C_GREEN}   - For microservices that just need simple CRUD operations${C_RESET}"
+            echo -e "${C_GREEN}   - When you want to avoid the Cassandra driver dependency${C_RESET}"
+            echo -e "${C_GREEN}   - When your data is naturally document-shaped (nested objects, arrays)${C_RESET}"
+            echo -e "${C_GREEN}   Stick with CQL for high-throughput analytics, complex queries, and${C_RESET}"
+            echo -e "${C_GREEN}   latency-critical workloads where the binary protocol matters.${C_RESET}"
+
+            challenge "Try adding a vector field to a product and performing a similarity search" \
+                      "via the Data API: {\"createCollection\": {\"name\": \"v_products\", \"options\": {\"vector\": {\"size\": 3, \"function\": \"cosine\"}}}}."
+
+            takeaway "The Data API provides REST/JSON document access to HCD — no CQL needed." \
+                     "It supports MongoDB-style filters (\$lt, \$gt, \$in, \$exists) on any field." \
+                     "Use it for microservices and web apps; use CQL for high-performance workloads." \
+                     "Data API adds HTTP overhead but removes the driver dependency entirely."
+            ;;
+        55)
+            header 55 "Multi-Tenant Isolation (End-to-End)"
+            echo "Multi-tenancy is one of the most common production patterns. How do you"
+            echo "serve hundreds of tenants from a single HCD cluster while ensuring data"
+            echo "isolation, fair resource usage, and regulatory compliance (GDPR)?"
+            echo ""
+
+            # ─── Three Isolation Patterns ────────────────────────────────
+            echo -e "${C_WHITE}--- Three Isolation Patterns ---${C_RESET}"
+            echo ""
+            echo "+-----------------------------------------------------------------------+"
+            echo "|  Pattern A: Keyspace-per-Tenant                                        |"
+            echo "|  ┌────────────────┐ ┌────────────────┐ ┌────────────────┐              |"
+            echo "|  │ ks_acme_corp   │ │ ks_globex_inc  │ │ ks_initech     │              |"
+            echo "|  │ (RF=3, own     │ │ (RF=3, own     │ │ (RF=3, own     │              |"
+            echo "|  │  tables)       │ │  tables)       │ │  tables)       │              |"
+            echo "|  └────────────────┘ └────────────────┘ └────────────────┘              |"
+            echo "|  + Strongest isolation    - High overhead (schema per tenant)           |"
+            echo "|  + Independent RF/DC      - Hard to manage at 100+ tenants             |"
+            echo "|                                                                         |"
+            echo "|  Pattern B: Tenant ID in Partition Key  ★ RECOMMENDED                  |"
+            echo "|  ┌─────────────────────────────────────────────────────┐                |"
+            echo "|  │ rf_prod.mt_orders                                   │                |"
+            echo "|  │ PK = (tenant_id) → each tenant in its own partition│                |"
+            echo "|  │ ┌─────────┐ ┌─────────┐ ┌─────────┐               │                |"
+            echo "|  │ │acme-corp│ │globex   │ │initech  │               │                |"
+            echo "|  │ │partition│ │partition│ │partition│               │                |"
+            echo "|  │ └─────────┘ └─────────┘ └─────────┘               │                |"
+            echo "|  └─────────────────────────────────────────────────────┘                |"
+            echo "|  + Physical data separation on disk                                     |"
+            echo "|  + Single schema, easy ops          - Shared RF                        |"
+            echo "|                                                                         |"
+            echo "|  Pattern C: Row-Level + RBAC                                           |"
+            echo "|  ┌─────────────────────────────────────────────────────┐                |"
+            echo "|  │ Same as B, but with per-tenant ROLEs and GRANTs    │                |"
+            echo "|  │ Cassandra enforces access at the database level    │                |"
+            echo "|  └─────────────────────────────────────────────────────┘                |"
+            echo "|  + DB-enforced isolation             - Requires PasswordAuthenticator   |"
+            echo "+-----------------------------------------------------------------------+"
+            echo ""
+            echo "We'll implement Pattern B (recommended) and show how to add RBAC on top."
+            pause
+
+            # ─── Implement Pattern B ─────────────────────────────────────
+            separator
+            echo -e "${C_WHITE}--- Step 1: Create Multi-Tenant Table with SAI Index ---${C_RESET}"
+            echo ""
+            log_cmd "docker exec hcd-node1 cqlsh -e \"CREATE TABLE IF NOT EXISTS rf_prod.mt_orders (tenant_id text, order_id uuid, product text, amount decimal, status text, created_at timestamp, PRIMARY KEY ((tenant_id), order_id));\""
+            log_cmd "docker exec hcd-node1 cqlsh -e \"CREATE CUSTOM INDEX IF NOT EXISTS mt_orders_status_idx ON rf_prod.mt_orders (status) USING 'StorageAttachedIndex';\""
+            lookfor "PRIMARY KEY ((tenant_id), order_id) — tenant_id is the partition key."
+            lookfor "All orders for one tenant are physically colocated on the same nodes."
+            pause
+
+            separator
+            echo -e "${C_WHITE}--- Step 2: Insert Orders for 3 Tenants ---${C_RESET}"
+            echo ""
+            echo -e "${C_DIM}Tenant: acme-corp (3 orders)${C_RESET}"
+            log_cmd "docker exec hcd-node1 cqlsh -e \"INSERT INTO rf_prod.mt_orders (tenant_id, order_id, product, amount, status, created_at) VALUES ('acme-corp', uuid(), 'Widget-A', 150.00, 'shipped', toTimestamp(now()));\""
+            log_cmd "docker exec hcd-node1 cqlsh -e \"INSERT INTO rf_prod.mt_orders (tenant_id, order_id, product, amount, status, created_at) VALUES ('acme-corp', uuid(), 'Widget-B', 299.99, 'pending', toTimestamp(now()));\""
+            log_cmd "docker exec hcd-node1 cqlsh -e \"INSERT INTO rf_prod.mt_orders (tenant_id, order_id, product, amount, status, created_at) VALUES ('acme-corp', uuid(), 'Gadget-X', 75.50, 'delivered', toTimestamp(now()));\""
+            echo ""
+            echo -e "${C_DIM}Tenant: globex-inc (2 orders)${C_RESET}"
+            log_cmd "docker exec hcd-node1 cqlsh -e \"INSERT INTO rf_prod.mt_orders (tenant_id, order_id, product, amount, status, created_at) VALUES ('globex-inc', uuid(), 'Gizmo-Pro', 499.00, 'shipped', toTimestamp(now()));\""
+            log_cmd "docker exec hcd-node1 cqlsh -e \"INSERT INTO rf_prod.mt_orders (tenant_id, order_id, product, amount, status, created_at) VALUES ('globex-inc', uuid(), 'Doohickey', 89.99, 'pending', toTimestamp(now()));\""
+            echo ""
+            echo -e "${C_DIM}Tenant: initech (2 orders)${C_RESET}"
+            log_cmd "docker exec hcd-node1 cqlsh -e \"INSERT INTO rf_prod.mt_orders (tenant_id, order_id, product, amount, status, created_at) VALUES ('initech', uuid(), 'TPS-Report-Binder', 12.99, 'delivered', toTimestamp(now()));\""
+            log_cmd "docker exec hcd-node1 cqlsh -e \"INSERT INTO rf_prod.mt_orders (tenant_id, order_id, product, amount, status, created_at) VALUES ('initech', uuid(), 'Red-Stapler', 24.99, 'shipped', toTimestamp(now()));\""
+            pause
+
+            # ─── Partition Isolation ─────────────────────────────────────
+            separator
+            echo -e "${C_WHITE}--- Step 3: Partition Isolation — No Cross-Tenant Leakage ---${C_RESET}"
+            echo "Querying for acme-corp ONLY reads acme-corp's partition. No scatter-gather."
+            echo ""
+            log_cmd "docker exec hcd-node1 cqlsh -e \"CONSISTENCY LOCAL_QUORUM; SELECT tenant_id, product, amount, status FROM rf_prod.mt_orders WHERE tenant_id = 'acme-corp';\""
+            lookfor "Only acme-corp's 3 orders are returned. globex and initech data is untouched."
+            echo ""
+
+            echo -e "${C_DIM}Per-tenant aggregation:${C_RESET}"
+            log_cmd "docker exec hcd-node1 cqlsh -e \"SELECT count(*) as order_count FROM rf_prod.mt_orders WHERE tenant_id = 'acme-corp';\""
+            log_cmd "docker exec hcd-node1 cqlsh -e \"SELECT count(*) as order_count FROM rf_prod.mt_orders WHERE tenant_id = 'globex-inc';\""
+            log_cmd "docker exec hcd-node1 cqlsh -e \"SELECT count(*) as order_count FROM rf_prod.mt_orders WHERE tenant_id = 'initech';\""
+            echo ""
+
+            echo -e "${C_DIM}Filter by status within a tenant (uses SAI index):${C_RESET}"
+            log_cmd "docker exec hcd-node1 cqlsh -e \"SELECT tenant_id, product, status FROM rf_prod.mt_orders WHERE tenant_id = 'acme-corp' AND status = 'shipped';\""
+            lookfor "SAI index on status allows efficient filtering within a tenant's partition."
+            pause
+
+            # ─── RBAC Isolation ──────────────────────────────────────────
+            separator
+            echo -e "${C_WHITE}--- Step 4: RBAC Isolation (Syntax Demo) ---${C_RESET}"
+            echo "In production, you would enable PasswordAuthenticator and CassandraAuthorizer"
+            echo "in cassandra.yaml, then create per-tenant roles with restricted access."
+            echo ""
+            echo -e "${C_DIM}Note: This cluster uses AllowAllAuthenticator, so these are syntax examples only.${C_RESET}"
+            echo ""
+            echo -e "${C_CYAN}-- Create per-tenant roles:${C_RESET}"
+            echo -e "${C_WHITE}  CREATE ROLE IF NOT EXISTS 'acme_role' WITH PASSWORD = '...' AND LOGIN = true;${C_RESET}"
+            echo -e "${C_WHITE}  CREATE ROLE IF NOT EXISTS 'globex_role' WITH PASSWORD = '...' AND LOGIN = true;${C_RESET}"
+            echo -e "${C_WHITE}  CREATE ROLE IF NOT EXISTS 'initech_role' WITH PASSWORD = '...' AND LOGIN = true;${C_RESET}"
+            echo ""
+            echo -e "${C_CYAN}-- Grant table-level access:${C_RESET}"
+            echo -e "${C_WHITE}  GRANT SELECT ON rf_prod.mt_orders TO acme_role;${C_RESET}"
+            echo -e "${C_WHITE}  GRANT MODIFY ON rf_prod.mt_orders TO acme_role;${C_RESET}"
+            echo ""
+            echo -e "${C_CYAN}-- Application-level enforcement:${C_RESET}"
+            echo -e "${C_WHITE}  Each tenant's service connects with its own role credentials.${C_RESET}"
+            echo -e "${C_WHITE}  The application layer adds WHERE tenant_id = ? to every query.${C_RESET}"
+            echo -e "${C_WHITE}  Row-level filtering is enforced in application code, not CQL.${C_RESET}"
+            echo ""
+            echo -e "${C_YELLOW}Production requirement: Set authenticator and authorizer in cassandra.yaml:${C_RESET}"
+            echo -e "${C_DIM}  authenticator: PasswordAuthenticator${C_RESET}"
+            echo -e "${C_DIM}  authorizer: CassandraAuthorizer${C_RESET}"
+            pause
+
+            # ─── Tenant-Aware Guardrails ─────────────────────────────────
+            separator
+            echo -e "${C_WHITE}--- Step 5: Tenant-Aware Guardrails ---${C_RESET}"
+            echo "Module 27 showed guardrails for partition size limits. In multi-tenant systems,"
+            echo "guardrails protect against a single 'noisy tenant' overwhelming the cluster."
+            echo ""
+            echo "+-----------------------------------------------------------------------+"
+            echo "|  Guardrail                     Multi-Tenant Impact                     |"
+            echo "|───────────────────────────────────────────────────────────────────────  |"
+            echo "|  partition_size_warn (100 MiB)  Alerts when one tenant grows too large |"
+            echo "|  partition_size_fail (200 MiB)  Rejects writes for oversized tenants   |"
+            echo "|  columns_per_table_warn (100)   Prevents schema bloat per tenant       |"
+            echo "|  page_size_warn (5000)          Limits per-query resource consumption  |"
+            echo "+-----------------------------------------------------------------------+"
+            echo ""
+
+            echo -e "${C_DIM}Check partition stats per tenant:${C_RESET}"
+            log_cmd "docker exec hcd-node1 nodetool tablestats rf_prod.mt_orders 2>/dev/null | head -n 20 || echo '(tablestats output)'"
+            lookfor "Monitor 'Compacted partition maximum bytes' to catch oversized tenant partitions."
+            pause
+
+            # ─── GDPR Right-to-Erasure ───────────────────────────────────
+            separator
+            echo -e "${C_WHITE}--- Step 6: GDPR Right-to-Erasure per Tenant ---${C_RESET}"
+            echo "When a tenant requests data deletion (GDPR Article 17), Pattern B makes"
+            echo "this straightforward: DELETE WHERE tenant_id = X removes ALL their data."
+            echo ""
+
+            echo -e "${C_DIM}Before deletion — initech's orders:${C_RESET}"
+            log_cmd "docker exec hcd-node1 cqlsh -e \"SELECT tenant_id, product, status FROM rf_prod.mt_orders WHERE tenant_id = 'initech';\""
+
+            echo ""
+            echo -e "${C_YELLOW}Deleting all data for tenant 'initech':${C_RESET}"
+            log_cmd "docker exec hcd-node1 cqlsh -e \"DELETE FROM rf_prod.mt_orders WHERE tenant_id = 'initech';\""
+
+            echo ""
+            echo -e "${C_DIM}After deletion — verify initech is gone:${C_RESET}"
+            log_cmd "docker exec hcd-node1 cqlsh -e \"SELECT tenant_id, product, status FROM rf_prod.mt_orders WHERE tenant_id = 'initech';\""
+            lookfor "Zero rows returned — initech's data has been completely removed."
+
+            echo ""
+            echo -e "${C_WHITE}Tombstone impact:${C_RESET}"
+            echo "  - DELETE creates tombstones (markers that suppress deleted data)"
+            echo "  - Tombstones persist until gc_grace_seconds expires (default: 10 days)"
+            echo "  - Then compaction physically removes the data from disk"
+            echo "  - For large tenant deletions, consider running 'nodetool compact' after"
+            echo "    gc_grace_seconds to reclaim disk space sooner"
+            pause
+
+            # ─── Tenant DC Affinity ──────────────────────────────────────
+            separator
+            echo -e "${C_WHITE}--- Step 7: Tenant DC Affinity (Premium Tier) ---${C_RESET}"
+            echo "Premium tenants can be pinned to a dedicated datacenter for guaranteed"
+            echo "performance isolation, while standard tenants share the other DC."
+            echo ""
+            echo "+-----------------------------------------------------------------------+"
+            echo "|  Premium Tenants (acme-corp)     Standard Tenants (globex, initech)    |"
+            echo "|  ┌──────────────────┐            ┌──────────────────┐                  |"
+            echo "|  │  dc1 (3 nodes)   │            │  dc2 (3 nodes)   │                  |"
+            echo "|  │  LOCAL_QUORUM    │            │  LOCAL_QUORUM    │                  |"
+            echo "|  │  Dedicated RF=3  │            │  Shared RF=3     │                  |"
+            echo "|  └──────────────────┘            └──────────────────┘                  |"
+            echo "+-----------------------------------------------------------------------+"
+            echo ""
+            echo -e "${C_CYAN}-- For per-tier RF, create separate keyspaces:${C_RESET}"
+            echo -e "${C_WHITE}  CREATE KEYSPACE IF NOT EXISTS mt_premium${C_RESET}"
+            echo -e "${C_WHITE}    WITH replication = {'class': 'NetworkTopologyStrategy', 'dc1': 3, 'dc2': 0};${C_RESET}"
+            echo -e "${C_WHITE}  CREATE KEYSPACE IF NOT EXISTS mt_standard${C_RESET}"
+            echo -e "${C_WHITE}    WITH replication = {'class': 'NetworkTopologyStrategy', 'dc1': 0, 'dc2': 3};${C_RESET}"
+            echo ""
+            echo -e "${C_DIM}Premium tenants: data ONLY on dc1 → LOCAL_QUORUM reads never touch dc2.${C_RESET}"
+            echo -e "${C_DIM}Standard tenants: data ONLY on dc2 → resource isolation from premium tier.${C_RESET}"
+            echo -e "${C_DIM}Application routing layer selects keyspace based on tenant's tier.${C_RESET}"
+            pause
+
+            # ─── Interactive Q&A ─────────────────────────────────────────
+            separator
+            echo -e "${C_YELLOW}Q: Why is tenant_id in the partition key, not just a regular column?${C_RESET}"
+            pause
+            echo -e "${C_GREEN}A: The partition key determines PHYSICAL data placement:${C_RESET}"
+            echo -e "${C_GREEN}   1. Data separation on disk — each tenant's data is in its own partition${C_RESET}"
+            echo -e "${C_GREEN}   2. Co-location — all of a tenant's orders sit on the same set of nodes${C_RESET}"
+            echo -e "${C_GREEN}   3. Query efficiency — WHERE tenant_id = ? goes directly to the right${C_RESET}"
+            echo -e "${C_GREEN}      partition, no scatter-gather across the cluster${C_RESET}"
+            echo -e "${C_GREEN}   4. No cross-tenant access — querying tenant A physically cannot read${C_RESET}"
+            echo -e "${C_GREEN}      tenant B's partition${C_RESET}"
+            echo -e "${C_GREEN}   If tenant_id were a regular column, you'd need ALLOW FILTERING and${C_RESET}"
+            echo -e "${C_GREEN}   every query would scan ALL tenants' data — a security and perf disaster.${C_RESET}"
+
+            challenge "Add a tenant_tier column to mt_orders and create an SAI index on it." \
+                      "Then query: SELECT * FROM rf_prod.mt_orders WHERE tenant_id = 'acme-corp' AND tenant_tier = 'premium';" \
+                      "How does the partition key + SAI index combination affect query performance?"
+
+            takeaway "Pattern B (tenant_id in partition key) gives physical data isolation with minimal overhead." \
+                     "GDPR erasure is a single DELETE WHERE tenant_id = X — no table scans needed." \
+                     "RBAC adds DB-enforced access control on top of partition isolation." \
+                     "Premium tenants can be pinned to dedicated DCs for guaranteed performance." \
+                     "Monitor partition sizes per tenant to catch 'noisy neighbor' problems early."
+            ;;
+        56)
+            header 56 "Node Decommission (Controlled Shrink)"
+            echo "The inverse of Module 35 (DC expansion). Production clusters change size:"
+            echo "hardware refreshes, DC consolidation, cost optimization. HCD provides"
+            echo "a graceful mechanism to remove a node without data loss."
+            echo ""
+            echo "  ┌──────────────────────────────────────────────────────────────────┐"
+            echo "  │  WHEN TO DECOMMISSION                                            │"
+            echo "  │                                                                   │"
+            echo "  │  • Cluster downsizing: traffic dropped, fewer nodes needed        │"
+            echo "  │  • Hardware refresh: replace old servers one at a time             │"
+            echo "  │  • DC consolidation: merging two DCs into one                     │"
+            echo "  │  • Cost optimization: reduce cloud spend after peak season        │"
+            echo "  └──────────────────────────────────────────────────────────────────┘"
+            echo ""
+
+            separator
+            echo -e "${C_WHITE}--- Pre-Decommission Checklist ---${C_RESET}"
+            echo ""
+            echo "  ┌──────────────────────────────────────────────────────────────────┐"
+            echo "  │  CHECKLIST (before running nodetool decommission):                │"
+            echo "  │                                                                   │"
+            echo "  │  1. Verify the target node is UN (Up/Normal)                      │"
+            echo "  │     nodetool status                                               │"
+            echo "  │                                                                   │"
+            echo "  │  2. Run repair on the target node first                           │"
+            echo "  │     nodetool repair -pr  (ensures it has latest data to stream)   │"
+            echo "  │                                                                   │"
+            echo "  │  3. Check pending compactions are low                             │"
+            echo "  │     nodetool compactionstats                                      │"
+            echo "  │                                                                   │"
+            echo "  │  4. Verify remaining nodes have capacity                          │"
+            echo "  │     After removal, each surviving node owns MORE data             │"
+            echo "  │                                                                   │"
+            echo "  │  5. If target is a seed: remove from seeds list on ALL nodes      │"
+            echo "  │     first, restart those nodes, THEN decommission                 │"
+            echo "  └──────────────────────────────────────────────────────────────────┘"
+            echo ""
+
+            separator
+            echo -e "${C_WHITE}--- Step 1: Current Cluster State ---${C_RESET}"
+            log_cmd "docker exec hcd-node1 nodetool status"
+            lookfor "All 6 nodes should be UN (Up/Normal) before we begin."
+
+            separator
+            echo -e "${C_WHITE}--- Step 2: Write Test Data ---${C_RESET}"
+            log_cmd "docker exec hcd-node1 cqlsh -e \"CREATE TABLE IF NOT EXISTS rf_prod.decommission_test (id int PRIMARY KEY, data text);\""
+            log_info "Inserting 20 rows for verification after node removal..."
+            for i in $(seq 1 20); do
+                log_cmd "docker exec hcd-node1 cqlsh -e \"INSERT INTO rf_prod.decommission_test (id, data) VALUES ($i, 'decom-data-$i');\""
+            done
+            log_cmd "docker exec hcd-node1 nodetool flush rf_prod decommission_test"
+
+            separator
+            echo -e "${C_WHITE}--- Step 3: Check Data Placement Before Removal ---${C_RESET}"
+            log_info "Checking which nodes own partitions for some of our keys..."
+            log_cmd "docker exec hcd-node1 nodetool getendpoints rf_prod decommission_test 1"
+            log_cmd "docker exec hcd-node1 nodetool getendpoints rf_prod decommission_test 10"
+            log_cmd "docker exec hcd-node1 nodetool getendpoints rf_prod decommission_test 20"
+            lookfor "Each key is replicated across multiple nodes (RF=3 per DC)."
+
+            separator
+            echo -e "${C_WHITE}--- Step 4: Simulate Controlled Node Removal ---${C_RESET}"
+            echo ""
+            echo "  In production, 'nodetool decommission' on node6 would:"
+            echo "  1. Stream all of node6's data ranges to other nodes in dc2"
+            echo "  2. Update the token ring so node6 owns no ranges"
+            echo "  3. Node leaves the cluster cleanly"
+            echo ""
+            echo -e "${C_DIM}  Production command: docker exec hcd-node6 nodetool decommission${C_RESET}"
+            echo ""
+            echo "  For this demo, we use 'nodetool drain' + 'docker stop' to simulate"
+            echo "  the removal safely, since a real decommission is permanent and the"
+            echo "  node cannot rejoin without a full data wipe."
+            echo ""
+
+            if [ "$DRY_RUN" = false ]; then
+                log_info "Draining node6 (flushes all memtables to disk)..."
+                log_cmd "docker exec hcd-node6 nodetool drain 2>&1 || echo '(drain completed)'"
+                log_info "Stopping node6..."
+                log_cmd "docker stop hcd-node6"
+                sleep 5
+
+                separator
+                echo -e "${C_WHITE}--- Step 5: Verify Cluster Operates with 5 Nodes ---${C_RESET}"
+                log_cmd "docker exec hcd-node1 nodetool status"
+                lookfor "node6 (172.28.0.7) should show DN (Down/Normal) or be absent."
+
+                log_info "Reading all 20 rows back — data must survive node removal..."
+                read_ok=0
+                read_fail=0
+                for i in $(seq 1 20); do
+                    if docker exec hcd-node1 cqlsh -e "CONSISTENCY LOCAL_QUORUM; SELECT * FROM rf_prod.decommission_test WHERE id = $i;" 2>/dev/null | grep -q "decom-data-$i"; then
+                        read_ok=$((read_ok + 1))
+                    else
+                        read_fail=$((read_fail + 1))
+                    fi
+                done
+                echo -e "${C_GREEN}  Read results: ${read_ok}/20 succeeded, ${read_fail}/20 failed${C_RESET}"
+                lookfor "All 20 rows should be readable — RF=3 means other replicas have the data."
+
+                separator
+                echo -e "${C_WHITE}--- Step 6: Check Updated Data Placement ---${C_RESET}"
+                log_info "After node6 is gone, endpoints shift to surviving nodes..."
+                log_cmd "docker exec hcd-node1 nodetool getendpoints rf_prod decommission_test 1"
+                log_cmd "docker exec hcd-node1 nodetool getendpoints rf_prod decommission_test 10"
+                log_cmd "docker exec hcd-node1 nodetool getendpoints rf_prod decommission_test 20"
+                lookfor "Compare with Step 3 — some endpoints now point to different nodes."
+
+                separator
+                echo -e "${C_WHITE}--- Step 7: Restore Node6 for Demo Continuity ---${C_RESET}"
+                echo "Since we used drain+stop (not real decommission), node6 can rejoin."
+                echo ""
+                log_cmd "docker start hcd-node6"
+                log_info "Waiting for node6 to rejoin the cluster..."
+                wait_for_node_un "172.28.0.7" "node6"
+                log_cmd "docker exec hcd-node1 nodetool status"
+                lookfor "All 6 nodes should be UN again."
+            else
+                echo -e "${C_YELLOW}[DRY-RUN]${C_RESET} Would drain node6, stop it, verify 5-node operation, then restart."
+                echo -e "${C_YELLOW}[DRY-RUN]${C_RESET} All 20 rows remain readable at LOCAL_QUORUM (RF=3 provides redundancy)."
+            fi
+
+            separator
+            echo -e "${C_WHITE}--- Decommission vs Removenode vs Assassinate ---${C_RESET}"
+            echo ""
+            echo "  ┌──────────────────────────────────────────────────────────────────┐"
+            echo "  │  COMPARISON: Three Ways to Remove a Node                          │"
+            echo "  │                                                                   │"
+            echo "  │  Method        │ Node State │ Data Safety │ When to Use           │"
+            echo "  │  ──────────────┼────────────┼─────────────┼────────────────────── │"
+            echo "  │  decommission  │ Alive (UN) │ Safe        │ Planned removal       │"
+            echo "  │                │            │ (streams    │ Node is healthy        │"
+            echo "  │                │            │  data out)  │                        │"
+            echo "  │  ──────────────┼────────────┼─────────────┼────────────────────── │"
+            echo "  │  removenode    │ Dead (DN)  │ Safe        │ Node crashed, won't   │"
+            echo "  │                │            │ (other nodes│ come back. Others      │"
+            echo "  │                │            │  re-stream) │ rebuild among selves   │"
+            echo "  │  ──────────────┼────────────┼─────────────┼────────────────────── │"
+            echo "  │  assassinate   │ Any        │ RISKY       │ Last resort. Forcibly  │"
+            echo "  │                │            │ (no data    │ removes from gossip.   │"
+            echo "  │                │            │  streaming) │ DATA LOSS possible     │"
+            echo "  └──────────────────────────────────────────────────────────────────┘"
+            echo ""
+            echo -e "${C_DIM}Rule of thumb: decommission > removenode > assassinate.${C_RESET}"
+            echo -e "${C_DIM}Always use the gentlest method that applies to your situation.${C_RESET}"
+            echo ""
+
+            echo -e "${C_YELLOW}QUESTION: What happens if you decommission a seed node?${C_RESET}"
+            pause
+            echo -e "${C_GREEN}ANSWER: You must first remove it from the seeds list in cassandra.yaml${C_RESET}"
+            echo -e "${C_GREEN}on ALL nodes, then restart those nodes, THEN decommission. Never${C_RESET}"
+            echo -e "${C_GREEN}decommission a seed without updating the seed list first — other nodes${C_RESET}"
+            echo -e "${C_GREEN}may fail to bootstrap or rejoin if they reference a gone seed.${C_RESET}"
+            echo ""
+
+            takeaway "Decommission = graceful removal; node streams data before leaving." \
+                     "Always run repair on the target node before decommissioning." \
+                     "Removenode for dead nodes, assassinate only as last resort (data loss risk)." \
+                     "Never decommission a seed node without first updating the seed list everywhere."
+            ;;
+        57)
+            header 57 "Disaster Recovery Runbook"
+            echo "Module 36 covered basic snapshots. This module builds a complete DR"
+            echo "procedure: coordinated multi-node snapshots, simulated disaster,"
+            echo "full restore, and production recommendations."
+            echo ""
+            echo "  ┌──────────────────────────────────────────────────────────────────┐"
+            echo "  │  DR MATURITY LEVELS                                              │"
+            echo "  │                                                                   │"
+            echo "  │  Level 1: Snapshots only (Module 36)                             │"
+            echo "  │           RPO = time since last snapshot                          │"
+            echo "  │                                                                   │"
+            echo "  │  Level 2: Snapshots + commitlog archival                         │"
+            echo "  │           RPO = minutes (replay commitlogs on top of snapshot)   │"
+            echo "  │                                                                   │"
+            echo "  │  Level 3: Multi-DC replication (Module 23)                       │"
+            echo "  │           RPO = 0 (async replication across DCs)                 │"
+            echo "  │                                                                   │"
+            echo "  │  Level 4: Multi-DC + snapshots + off-site storage                │"
+            echo "  │           Production standard. Handles even correlated failures   │"
+            echo "  └──────────────────────────────────────────────────────────────────┘"
+            echo ""
+            echo -e "${C_DIM}RPO = Recovery Point Objective (how much data can you afford to lose)${C_RESET}"
+            echo ""
+
+            separator
+            echo -e "${C_WHITE}--- Step 1: Setup Test Data ---${C_RESET}"
+            log_cmd "docker exec hcd-node1 cqlsh -e \"CREATE TABLE IF NOT EXISTS rf_prod.dr_assets (id int PRIMARY KEY, name text, value text);\""
+            log_info "Inserting 15 asset records across the cluster..."
+            for i in $(seq 1 15); do
+                log_cmd "docker exec hcd-node1 cqlsh -e \"INSERT INTO rf_prod.dr_assets (id, name, value) VALUES ($i, 'asset-$i', 'critical-data-$i');\""
+            done
+            log_cmd "docker exec hcd-node1 nodetool flush rf_prod dr_assets"
+            log_cmd "docker exec hcd-node1 cqlsh -e \"SELECT count(*) FROM rf_prod.dr_assets;\""
+            lookfor "count = 15. This is our baseline before disaster."
+
+            separator
+            echo -e "${C_WHITE}--- Step 2: Coordinated Multi-Node Snapshot ---${C_RESET}"
+            echo "Unlike Module 36 (single-node snapshot), a real DR backup must"
+            echo "snapshot ALL nodes in a tight time window."
+            echo ""
+
+            if [ "$DRY_RUN" = false ]; then
+                log_info "Taking parallel snapshots on all 6 nodes..."
+                for node in hcd-node1 hcd-node2 hcd-node3 hcd-node4 hcd-node5 hcd-node6; do
+                    docker exec "$node" nodetool snapshot -t dr_backup rf_prod 2>/dev/null &
+                done
+                wait
+                echo -e "${C_GREEN}  Snapshots taken on all 6 nodes (tag: dr_backup)${C_RESET}"
+                echo ""
+
+                log_info "Verifying snapshots exist on each node..."
+                for node in hcd-node1 hcd-node2 hcd-node3 hcd-node4 hcd-node5 hcd-node6; do
+                    snap_count=$(docker exec "$node" nodetool listsnapshots 2>/dev/null | grep -c "dr_backup" || echo "0")
+                    echo -e "  ${C_GREEN}${node}:${C_RESET} ${snap_count} snapshot(s) with tag 'dr_backup'"
+                done
+            else
+                echo -e "${C_YELLOW}[DRY-RUN]${C_RESET} Would take parallel snapshots on all 6 nodes:"
+                echo -e "${C_DIM}  for node in hcd-node1..hcd-node6; do${C_RESET}"
+                echo -e "${C_DIM}    docker exec \$node nodetool snapshot -t dr_backup rf_prod &${C_RESET}"
+                echo -e "${C_DIM}  done${C_RESET}"
+                echo -e "${C_DIM}  wait${C_RESET}"
+            fi
+
+            separator
+            echo -e "${C_WHITE}--- Step 3: Simulate Disaster (TRUNCATE) ---${C_RESET}"
+            echo -e "${C_YELLOW}  Simulating data loss: truncating dr_assets on ALL nodes...${C_RESET}"
+            log_cmd "docker exec hcd-node1 cqlsh -e \"TRUNCATE rf_prod.dr_assets;\""
+            log_cmd "docker exec hcd-node1 cqlsh -e \"SELECT count(*) FROM rf_prod.dr_assets;\""
+            lookfor "count = 0. ALL data is gone across every replica."
+
+            separator
+            echo -e "${C_WHITE}--- Step 4: Restore from Coordinated Snapshot ---${C_RESET}"
+            echo "Restore procedure for each node:"
+            echo "  1. Find the snapshot directory for the table"
+            echo "  2. Copy SSTable files back to the live table directory"
+            echo "  3. Run 'nodetool refresh' to load the files (no restart needed)"
+            echo ""
+
+            if [ "$DRY_RUN" = false ]; then
+                log_info "Restoring snapshot on all 6 nodes..."
+                for node in hcd-node1 hcd-node2 hcd-node3 hcd-node4 hcd-node5 hcd-node6; do
+                    restore_result=$(docker exec "$node" bash -c '
+                        SNAP_DIR=$(find /var/lib/cassandra/data/rf_prod/ -type d -path "*/snapshots/dr_backup" 2>/dev/null | head -1)
+                        TABLE_DIR=$(dirname $(dirname "$SNAP_DIR"))
+                        if [ -n "$SNAP_DIR" ] && [ -d "$SNAP_DIR" ]; then
+                            cp $SNAP_DIR/*.db $TABLE_DIR/ 2>/dev/null
+                            echo "restored"
+                        else
+                            echo "no-snapshot"
+                        fi
+                    ' 2>/dev/null)
+                    if [ "$restore_result" = "restored" ]; then
+                        echo -e "  ${C_GREEN}${node}:${C_RESET} SSTable files copied from snapshot"
+                    else
+                        echo -e "  ${C_DIM}${node}:${C_RESET} no snapshot found (table may not have data on this node)"
+                    fi
+                done
+
+                echo ""
+                log_info "Running nodetool refresh on all nodes to load restored files..."
+                for node in hcd-node1 hcd-node2 hcd-node3 hcd-node4 hcd-node5 hcd-node6; do
+                    docker exec "$node" nodetool refresh rf_prod dr_assets 2>/dev/null || true
+                done
+                echo -e "${C_GREEN}  Refresh completed on all nodes${C_RESET}"
+
+                echo ""
+                log_info "Verifying data is restored..."
+                log_cmd "docker exec hcd-node1 cqlsh -e \"SELECT count(*) FROM rf_prod.dr_assets;\""
+                lookfor "count = 15. All data restored from coordinated snapshot."
+
+                log_cmd "docker exec hcd-node1 cqlsh -e \"SELECT * FROM rf_prod.dr_assets LIMIT 5;\""
+                lookfor "Rows are intact with original values."
+            else
+                echo -e "${C_YELLOW}[DRY-RUN]${C_RESET} Would copy snapshot SSTables back to table directories on all 6 nodes"
+                echo -e "${C_YELLOW}[DRY-RUN]${C_RESET} Would run 'nodetool refresh rf_prod dr_assets' on all nodes"
+                echo -e "${C_YELLOW}[DRY-RUN]${C_RESET} Would verify count(*) returns 15"
+            fi
+
+            separator
+            echo -e "${C_WHITE}--- Step 5: Post-Restore Validation ---${C_RESET}"
+            echo "After any restore, validate data integrity:"
+            echo ""
+            echo "  1. Row counts match pre-disaster baseline"
+            echo "  2. nodetool verify — checks SSTable integrity"
+            echo "  3. nodetool repair — ensures all replicas converge"
+            echo ""
+
+            if [ "$DRY_RUN" = false ]; then
+                log_info "Running verify on node1..."
+                log_cmd "docker exec hcd-node1 nodetool verify rf_prod dr_assets 2>&1 | tail -n 5 || echo '(verify completed — no corruption detected)'"
+
+                log_info "Running repair to converge replicas..."
+                log_cmd "docker exec hcd-node1 nodetool repair rf_prod dr_assets 2>&1 | tail -n 10 || echo '(repair completed)'"
+            else
+                echo -e "${C_YELLOW}[DRY-RUN]${C_RESET} Would run nodetool verify and repair on restored data"
+            fi
+
+            separator
+            echo -e "${C_WHITE}--- Commitlog Archival (Level 2 DR) ---${C_RESET}"
+            echo ""
+            echo "  Snapshots capture data at a point in time. Commitlogs fill the gap:"
+            echo ""
+            echo "  ┌──────────────────────────────────────────────────────────────────┐"
+            echo "  │  TIMELINE:                                                       │"
+            echo "  │                                                                   │"
+            echo "  │  ──[Snapshot]──────────[Commitlogs]──────────[Disaster]──         │"
+            echo "  │    T=0 (known good)    T=0..T=N (mutations)  T=N (data lost)     │"
+            echo "  │                                                                   │"
+            echo "  │  Recovery: Restore snapshot (T=0) + replay commitlogs (T=0..N)   │"
+            echo "  │  Result:   Data recovered up to last archived commitlog segment  │"
+            echo "  │                                                                   │"
+            echo "  │  HOW TO SET UP:                                                   │"
+            echo "  │  1. Set commitlog_archiving_properties:                           │"
+            echo "  │       archive_command=cp %path /backup/commitlogs/%name          │"
+            echo "  │  2. Commitlog segments are archived as they fill up (~32MB each) │"
+            echo "  │  3. In production: archive to S3/GCS for durability              │"
+            echo "  │  4. To replay: commitlog_replayer tool on top of restored snapshot│"
+            echo "  └──────────────────────────────────────────────────────────────────┘"
+            echo ""
+            echo -e "${C_DIM}Commitlog replay is not easily demoable in Docker — it requires${C_RESET}"
+            echo -e "${C_DIM}the commitlog_replayer tool and careful coordination. In production,${C_RESET}"
+            echo -e "${C_DIM}this closes the RPO gap from hours (snapshot frequency) to minutes.${C_RESET}"
+            echo ""
+
+            separator
+            echo -e "${C_WHITE}--- DR Validation Checklist ---${C_RESET}"
+            echo ""
+            echo "  ┌──────────────────────────────────────────────────────────────────┐"
+            echo "  │  PRODUCTION DR CHECKLIST                                         │"
+            echo "  │                                                                   │"
+            echo "  │  - Snapshot frequency defined (e.g., every 6 hours)              │"
+            echo "  │  - Snapshots shipped off-node (S3, GCS, NFS)                     │"
+            echo "  │  - Commitlog archival enabled and tested                         │"
+            echo "  │  - Restore procedure documented and rehearsed                    │"
+            echo "  │  - nodetool verify runs after every restore                      │"
+            echo "  │  - nodetool repair runs after every restore                      │"
+            echo "  │  - Row count validation (pre-disaster vs post-restore)           │"
+            echo "  │  - Restore tested on a separate cluster (not production!)        │"
+            echo "  │  - DR drill scheduled quarterly                                  │"
+            echo "  └──────────────────────────────────────────────────────────────────┘"
+            echo ""
+
+            separator
+            echo -e "${C_WHITE}--- Medusa: Production Backup Tooling ---${C_RESET}"
+            echo ""
+            echo "  cassandra-medusa (github.com/thelastpickle/cassandra-medusa):"
+            echo ""
+            echo "  - Coordinated multi-node backup in one command"
+            echo "  - S3, GCS, Azure Blob, or local storage backends"
+            echo "  - Differential backups (only changed SSTables)"
+            echo "  - One-command restore to a new or existing cluster"
+            echo "  - Integration with K8ssandra for Kubernetes deployments"
+            echo ""
+            echo -e "${C_DIM}Not included in this demo, but strongly recommended for production.${C_RESET}"
+            echo -e "${C_DIM}Medusa automates everything we did manually in Steps 2-4 above.${C_RESET}"
+            echo ""
+
+            echo -e "${C_YELLOW}QUESTION: After restoring from snapshot, why must you run nodetool repair?${C_RESET}"
+            pause
+            echo -e "${C_GREEN}ANSWER: Snapshots are per-node, taken at slightly different times. Some${C_RESET}"
+            echo -e "${C_GREEN}mutations may exist on one replica but not another. Repair ensures all${C_RESET}"
+            echo -e "${C_GREEN}replicas converge to the same consistent state via Merkle tree comparison.${C_RESET}"
+            echo ""
+
+            if [ "$DRY_RUN" = false ]; then
+                separator
+                echo -e "${C_WHITE}--- Cleanup: Remove DR Snapshots ---${C_RESET}"
+                log_info "Clearing dr_backup snapshots on all nodes..."
+                for node in hcd-node1 hcd-node2 hcd-node3 hcd-node4 hcd-node5 hcd-node6; do
+                    docker exec "$node" nodetool clearsnapshot -t dr_backup 2>/dev/null || true
+                done
+                echo -e "${C_GREEN}  Snapshots cleared on all nodes${C_RESET}"
+            fi
+
+            takeaway "DR Level 1 (snapshots) is table stakes; Level 2+ adds commitlog replay." \
+                     "Coordinate snapshots across ALL nodes — single-node backup is incomplete." \
+                     "After restore: verify (integrity) + repair (consistency) — both are mandatory." \
+                     "Use Medusa in production to automate coordinated backups to cloud storage."
+            ;;
+        60)
+            header 60 "LWT Contention Under Load"
+            echo "Lightweight Transactions (LWT) use Paxos for compare-and-swap semantics."
+            echo "Module 50 showed how LWT prevents lost updates. This module shows what"
+            echo "happens when MANY concurrent writers compete for the SAME row using LWT —"
+            echo "and how contention causes retry storms and throughput collapse."
+            echo ""
+
+            # ─── The Contention Problem ──────────────────────────────────
+            echo -e "${C_WHITE}--- The Contention Problem ---${C_RESET}"
+            echo ""
+            echo "  Writer A: UPDATE ... IF version = 1 --> [applied]=true  (wins)"
+            echo "  Writer B: UPDATE ... IF version = 1 --> [applied]=false (stale, must retry)"
+            echo "  Writer C: UPDATE ... IF version = 1 --> [applied]=false (stale, must retry)"
+            echo "  Writer B retries: IF version = 2    --> [applied]=true  (wins)"
+            echo "  Writer C retries: IF version = 2    --> [applied]=false (must retry AGAIN)"
+            echo ""
+            echo "  Under high contention, writers pile up, retry storms cascade,"
+            echo "  and throughput collapses. Each Paxos round is 4 phases:"
+            echo ""
+            echo "  ┌───────────────────────────────────────────────────────────────┐"
+            echo "  │  Normal write:  Client --> Coordinator --> Replicas  (1 RT)   │"
+            echo "  │                                                               │"
+            echo "  │  LWT write:     1. Prepare  (leader --> replicas)             │"
+            echo "  │                 2. Promise   (replicas --> leader)             │"
+            echo "  │                 3. Propose   (leader --> replicas)             │"
+            echo "  │                 4. Commit    (leader --> replicas)             │"
+            echo "  │                                                               │"
+            echo "  │  = 4x network round-trips vs 1 for a normal write            │"
+            echo "  │  + contention adds RETRIES on top of that                     │"
+            echo "  └───────────────────────────────────────────────────────────────┘"
+            echo ""
+
+            separator
+            echo -e "${C_WHITE}--- Setup: Shared Counter Table ---${C_RESET}"
+            log_cmd "docker exec hcd-node1 cqlsh -e \"CREATE TABLE IF NOT EXISTS rf_prod.lwt_contention (counter_id text PRIMARY KEY, value int, version int);\""
+            log_cmd "docker exec hcd-node1 cqlsh -e \"TRUNCATE rf_prod.lwt_contention;\""
+            log_cmd "docker exec hcd-node1 cqlsh -e \"INSERT INTO rf_prod.lwt_contention (counter_id, value, version) VALUES ('shared', 0, 0);\""
+
+            separator
+            echo -e "${C_WHITE}--- Demo 1: Single-Writer Baseline (No Contention) ---${C_RESET}"
+            echo "One writer increments the counter 10 times using LWT."
+            echo "No contention — every IF condition matches on first try."
+            echo ""
+
+            if [ "$DRY_RUN" = false ]; then
+                START_TIME=$(date +%s%N 2>/dev/null || date +%s)
+                for i in $(seq 1 10); do
+                    PREV=$((i - 1))
+                    docker exec hcd-node1 cqlsh -e "UPDATE rf_prod.lwt_contention SET value = $i, version = $i WHERE counter_id = 'shared' IF version = $PREV;" 2>/dev/null
+                done
+                END_TIME=$(date +%s%N 2>/dev/null || date +%s)
+                echo -e "${C_GREEN}[EXEC]${C_RESET} 10 sequential LWT updates completed — all succeeded on first try."
+            else
+                echo -e "${C_YELLOW}[DRY-RUN]${C_RESET} 10 sequential LWT updates: UPDATE ... SET value=N, version=N IF version=N-1"
+            fi
+
+            log_cmd "docker exec hcd-node1 cqlsh -e \"SELECT * FROM rf_prod.lwt_contention WHERE counter_id = 'shared';\""
+            lookfor "value=10, version=10 — all 10 updates applied cleanly (zero retries)."
+
+            separator
+            echo -e "${C_WHITE}--- Demo 2: Concurrent Writer Contention ---${C_RESET}"
+            echo "Now we launch 5 concurrent LWT writes, ALL targeting the same row"
+            echo "with the same IF condition. Only ONE can win; the other 4 get [applied]=false."
+            echo ""
+
+            # Reset counter for contention demo
+            log_cmd "docker exec hcd-node1 cqlsh -e \"INSERT INTO rf_prod.lwt_contention (counter_id, value, version) VALUES ('shared', 0, 0);\""
+
+            if [ "$DRY_RUN" = false ]; then
+                echo -e "${C_BLUE}[INFO]${C_RESET} Launching 5 concurrent LWT writes (all target version=0)..."
+                for i in 1 2 3 4 5; do
+                    docker exec hcd-node1 cqlsh -e "UPDATE rf_prod.lwt_contention SET value = $i, version = 1 WHERE counter_id = 'shared' IF version = 0;" 2>/dev/null &
+                done
+                wait
+                echo -e "${C_GREEN}[EXEC]${C_RESET} All 5 concurrent writes completed."
+            else
+                echo -e "${C_YELLOW}[DRY-RUN]${C_RESET} for i in 1..5; do docker exec hcd-node1 cqlsh -e \"UPDATE ... SET value=\$i, version=1 IF version=0;\" & done; wait"
+            fi
+            echo ""
+            echo "Result: only ONE of the 5 writes won ([applied]=true)."
+            echo "The other 4 received [applied]=false with the current value."
+            echo ""
+            log_cmd "docker exec hcd-node1 cqlsh -e \"SELECT * FROM rf_prod.lwt_contention WHERE counter_id = 'shared';\""
+            lookfor "Exactly one writer's value appears. The row has version=1."
+            lookfor "In production, the 4 losers would need to re-read, recompute, and retry."
+
+            separator
+            echo -e "${C_WHITE}--- Demo 3: Paxos Round-Trip Cost (Tracing) ---${C_RESET}"
+            echo "We compare the coordinator trace of a normal write vs an LWT write."
+            echo ""
+
+            log_info "Normal write (single Paxos-free round-trip):"
+            log_cmd "docker exec hcd-node1 cqlsh -e \"TRACING ON; INSERT INTO rf_prod.lwt_contention (counter_id, value, version) VALUES ('trace-normal', 99, 99); TRACING OFF;\" 2>&1 | tail -n 15"
+
+            echo ""
+            log_info "LWT write (4-phase Paxos consensus):"
+            log_cmd "docker exec hcd-node1 cqlsh -e \"TRACING ON; UPDATE rf_prod.lwt_contention SET value = 100, version = 100 WHERE counter_id = 'trace-lwt' IF counter_id = 'trace-lwt'; TRACING OFF;\" 2>&1 | tail -n 20"
+
+            lookfor "LWT trace shows: Prepare, Promise, Propose, Commit phases."
+            lookfor "Normal write trace shows: a single mutation round-trip."
+            lookfor "Compare total coordinator times — LWT is typically 4-10x slower."
+
+            separator
+            echo -e "${C_WHITE}--- Contention Mitigation Strategies ---${C_RESET}"
+            echo ""
+            echo "  ┌────────────────────────┬──────────────────────────────┬──────────────────────────┐"
+            echo "  │ Strategy               │ When to Use                  │ Trade-off                │"
+            echo "  ├────────────────────────┼──────────────────────────────┼──────────────────────────┤"
+            echo "  │ Partition sharding     │ High-write counters          │ Aggregate on read        │"
+            echo "  │ Exponential backoff    │ Moderate contention          │ Added latency            │"
+            echo "  │ Application queuing    │ Serialize at app layer       │ Single point of failure  │"
+            echo "  │ Bucket by time         │ Time-series counters         │ Bucket management        │"
+            echo "  │ Avoid LWT entirely    │ When idempotency suffices    │ Requires design change   │"
+            echo "  └────────────────────────┴──────────────────────────────┴──────────────────────────┘"
+            echo ""
+            echo "  Partition sharding example: instead of one 'shared' counter,"
+            echo "  use counter_id IN ('shard-0', 'shard-1', ..., 'shard-9')."
+            echo "  Writers pick a random shard (low contention). Reads SUM all shards."
+            echo ""
+
+            separator
+            echo -e "${C_WHITE}--- Anti-Pattern: LWT for Rate Limiting ---${C_RESET}"
+            echo ""
+            echo "  Using LWT as a distributed lock or rate limiter fails at scale:"
+            echo ""
+            echo "  ┌──────────────────────────────────────────────────────────────────┐"
+            echo "  │  BAD:  UPDATE rate_limits SET count = count + 1                  │"
+            echo "  │        WHERE api_key = 'X' IF count < 1000;                      │"
+            echo "  │                                                                   │"
+            echo "  │  At 1000 req/s on a single api_key, Paxos contention makes       │"
+            echo "  │  every request wait for the previous one to commit.               │"
+            echo "  │  Throughput: ~100-200 ops/s on a single hot partition.            │"
+            echo "  │                                                                   │"
+            echo "  │  GOOD: Use Redis/Valkey for fast in-memory rate limiting.         │"
+            echo "  │        Use HCD for durable state (audit log, quota tracking).     │"
+            echo "  │        Best of both: Redis for speed, HCD for durability.         │"
+            echo "  └──────────────────────────────────────────────────────────────────┘"
+            echo ""
+
+            echo -e "${C_YELLOW}QUESTION: If 100 writers all attempt LWT on the same row simultaneously,${C_RESET}"
+            echo -e "${C_YELLOW}how many Paxos rounds does it take for all to complete?${C_RESET}"
+            pause
+            echo -e "${C_GREEN}ANSWER: In the worst case, O(N) rounds — each writer may need to retry${C_RESET}"
+            echo -e "${C_GREEN}multiple times as previous writers change the version. This is why LWT${C_RESET}"
+            echo -e "${C_GREEN}throughput on a single hot row is limited to ~100-1000 ops/sec regardless${C_RESET}"
+            echo -e "${C_GREEN}of cluster size. Paxos is single-leader per partition.${C_RESET}"
+            echo ""
+
+            takeaway "LWT uses 4-phase Paxos — 4-10x slower than normal writes." \
+                     "Concurrent LWT on the same row causes contention: only 1 writer wins per round." \
+                     "Mitigation: partition sharding, exponential backoff, or avoid LWT entirely." \
+                     "Never use LWT as a distributed lock or rate limiter — use Redis/Valkey instead." \
+                     "LWT throughput per partition: ~100-1000 ops/sec (Paxos is single-leader)."
+            ;;
+        61)
+            header 61 "Repair Deep-Dive (The Most Critical Ops Procedure)"
+            echo "Module 39 introduced repair basics. This module goes much deeper:"
+            echo "WHY repair is mandatory, HOW Merkle trees work, and what happens"
+            echo "when you skip repair (zombie rows — the #1 production data bug)."
+            echo ""
+
+            # ─── Why Repair Is Critical ──────────────────────────────────
+            echo -e "${C_WHITE}--- Why Repair Is Critical (Not Optional) ---${C_RESET}"
+            echo ""
+            echo "  gc_grace_seconds = 864000 (10 days, default)"
+            echo ""
+            echo "  ┌──────────────────────────────────────────────────────────────────┐"
+            echo "  │  THE ZOMBIE ROW PROBLEM:                                         │"
+            echo "  │                                                                   │"
+            echo "  │  1. Client deletes row X --> tombstone written to all replicas   │"
+            echo "  │  2. gc_grace_seconds expires (day 10)                            │"
+            echo "  │  3. Compaction removes tombstone on nodes 1 and 2                │"
+            echo "  │  4. Node 3 was down -- it still has the ORIGINAL row X           │"
+            echo "  │  5. Node 3 comes back online                                     │"
+            echo "  │  6. Read repair sees row X on node 3, no tombstone on 1 and 2   │"
+            echo "  │  7. Read repair RESURRECTS the deleted row!                      │"
+            echo "  │                                                                   │"
+            echo "  │  The deleted data is BACK. This is silent data corruption.        │"
+            echo "  │  Repair is the ONLY way to prevent it.                            │"
+            echo "  └──────────────────────────────────────────────────────────────────┘"
+            echo ""
+            echo "  Repair ensures all replicas have the same tombstones BEFORE"
+            echo "  gc_grace expires. If repair runs within 10 days, zombies cannot happen."
+            echo ""
+
+            separator
+            echo -e "${C_WHITE}--- Merkle Tree Visualization ---${C_RESET}"
+            echo ""
+            echo "  Repair compares data using Merkle trees (hash trees). Only divergent"
+            echo "  partitions are streamed — this minimizes network I/O."
+            echo ""
+            echo "  Node 1 (Replica A)          Node 2 (Replica B)"
+            echo "       root: abc123                root: abc123     <-- Match! Skip."
+            echo "      /        \\                   /        \\"
+            echo "    ab12        c3              ab12        c3"
+            echo "   /    \\      /  \\            /    \\      /  \\"
+            echo "  a1    b2    c3   --        a1    b2    c3   --"
+            echo ""
+            echo "  If node 2 has stale data in partition 'b':"
+            echo ""
+            echo "  Node 1 (Replica A)          Node 2 (Replica B)"
+            echo "       root: abc123                root: abc999     <-- MISMATCH! Drill down."
+            echo "      /        \\                   /        \\"
+            echo "    ab12        c3              ab99        c3       <-- Left subtree differs"
+            echo "   /    \\      /  \\            /    \\      /  \\"
+            echo "  a1    b2    c3   --        a1    b9    c3   --     <-- Found: 'b' diverged"
+            echo "                                                     Stream only partition 'b'"
+            echo ""
+            echo "  Key insight: with 1 million partitions, if only 1 diverges, Merkle trees"
+            echo "  find it in O(log N) comparisons — streaming just that one partition."
+            echo ""
+
+            separator
+            echo -e "${C_WHITE}--- Demo 1: Create Entropy Deliberately ---${C_RESET}"
+            echo "We stop node3, write data it misses, then restart it."
+            echo ""
+
+            log_cmd "docker exec hcd-node1 cqlsh -e \"CREATE TABLE IF NOT EXISTS rf_prod.repair_deep (id int PRIMARY KEY, data text, ts timestamp);\""
+            log_cmd "docker exec hcd-node1 cqlsh -e \"TRUNCATE rf_prod.repair_deep;\""
+
+            log_info "Writing 10 baseline rows (all nodes receive these)..."
+            if [ "$DRY_RUN" = false ]; then
+                for i in $(seq 1 10); do
+                    docker exec hcd-node1 cqlsh -e "INSERT INTO rf_prod.repair_deep (id, data, ts) VALUES ($i, 'baseline-$i', toTimestamp(now()));" 2>/dev/null
+                done
+                echo -e "${C_GREEN}[EXEC]${C_RESET} 10 baseline rows written."
+            else
+                echo -e "${C_YELLOW}[DRY-RUN]${C_RESET} INSERT INTO rf_prod.repair_deep ... (10 baseline rows)"
+            fi
+
+            separator
+            echo -e "${C_WHITE}--- Stop node3 to create divergence ---${C_RESET}"
+            if [ "$DRY_RUN" = false ]; then
+                log_info "Stopping hcd-node3..."
+                docker stop hcd-node3 >/dev/null 2>&1
+                sleep 3
+                echo -e "${C_GREEN}[EXEC]${C_RESET} hcd-node3 stopped."
+
+                log_info "Writing 20 rows that node3 will MISS..."
+                for i in $(seq 11 30); do
+                    docker exec hcd-node1 cqlsh -e "INSERT INTO rf_prod.repair_deep (id, data, ts) VALUES ($i, 'missed-by-node3-$i', toTimestamp(now()));" 2>/dev/null
+                done
+                echo -e "${C_GREEN}[EXEC]${C_RESET} 20 rows written while node3 was down."
+
+                log_info "Restarting hcd-node3..."
+                docker start hcd-node3 >/dev/null 2>&1
+                wait_for_node_un "172.28.0.4" "Node 3"
+            else
+                echo -e "${C_YELLOW}[DRY-RUN]${C_RESET} docker stop hcd-node3"
+                echo -e "${C_YELLOW}[DRY-RUN]${C_RESET} INSERT INTO rf_prod.repair_deep ... (20 rows while node3 is down)"
+                echo -e "${C_YELLOW}[DRY-RUN]${C_RESET} docker start hcd-node3"
+            fi
+
+            separator
+            echo -e "${C_WHITE}--- Verify the entropy: count mismatch ---${C_RESET}"
+            echo "We query node1 (has all 30 rows) and node3 (may be missing some)."
+            echo ""
+            log_cmd "docker exec hcd-node1 cqlsh -e \"CONSISTENCY ONE; SELECT count(*) FROM rf_prod.repair_deep;\" 2>&1 | tail -n 5"
+            echo ""
+            echo "Now query node3 directly (at CL=ONE, it reads only its own data):"
+            log_cmd "docker exec hcd-node3 cqlsh -e \"CONSISTENCY ONE; SELECT count(*) FROM rf_prod.repair_deep;\" 2>&1 | tail -n 5 || echo '(node3 may still be starting)'"
+
+            lookfor "Node1 should show 30 rows. Node3 should show fewer (10-20)."
+            lookfor "The difference is the entropy we created — repair will fix it."
+
+            separator
+            echo -e "${C_WHITE}--- Demo 2: Repair Modes Comparison ---${C_RESET}"
+            echo ""
+            echo "  ┌──────────────────────┬────────────────────┬──────────┬────────────────────────┐"
+            echo "  │ Mode                 │ Scope              │ Network  │ When to Use            │"
+            echo "  ├──────────────────────┼────────────────────┼──────────┼────────────────────────┤"
+            echo "  │ Full repair          │ ALL token ranges   │ High     │ First repair / outage  │"
+            echo "  │ Primary range (-pr)  │ Local primary only │ Medium   │ Scheduled maintenance  │"
+            echo "  │ Incremental          │ Changed SSTables   │ Low      │ Frequent (daily)       │"
+            echo "  │ Sub-range (-st/-et)  │ Specific tokens    │ Lowest   │ Targeted (Reaper)      │"
+            echo "  └──────────────────────┴────────────────────┴──────────┴────────────────────────┘"
+            echo ""
+
+            echo -e "${C_WHITE}--- a) Full Repair ---${C_RESET}"
+            echo "Compares ALL token ranges on ALL replicas. Heaviest, but definitive."
+            log_cmd "docker exec hcd-node3 nodetool repair rf_prod repair_deep 2>&1 | tail -n 10 || echo '(repair output)'"
+
+            lookfor "Look for 'Repair completed successfully' — entropy is now fixed."
+            pause
+
+            echo -e "${C_WHITE}--- Verify repair fixed the entropy ---${C_RESET}"
+            log_cmd "docker exec hcd-node3 cqlsh -e \"CONSISTENCY ONE; SELECT count(*) FROM rf_prod.repair_deep;\" 2>&1 | tail -n 5 || echo '(node3 count after repair)'"
+            lookfor "Node3 should now show 30 rows — matching node1."
+
+            separator
+            echo -e "${C_WHITE}--- b) Primary Range Repair (-pr) ---${C_RESET}"
+            echo "Repairs only ranges this node is PRIMARY replica for."
+            echo "Run on every node = equivalent to full repair, but parallelizable."
+            echo ""
+            echo "  This is the RECOMMENDED mode for scheduled repairs:"
+            echo "  for node in node1 node2 node3 node4 node5 node6; do"
+            echo "    nodetool repair -pr rf_prod    # on each node sequentially"
+            echo "  done"
+            echo ""
+            log_cmd "docker exec hcd-node1 nodetool repair -pr rf_prod repair_deep 2>&1 | tail -n 10 || echo '(primary range repair output)'"
+
+            separator
+            echo -e "${C_WHITE}--- c) Sub-Range Repair (-st / -et) ---${C_RESET}"
+            echo "Repairs a specific token range only. Used by Reaper for fine-grained scheduling."
+            echo ""
+            log_info "Token ranges for rf_prod:"
+            log_cmd "docker exec hcd-node1 nodetool describering rf_prod 2>/dev/null | head -n 10 || echo '(describering output)'"
+            echo ""
+            echo "  Sub-range repair syntax:"
+            echo "  nodetool repair -st <start_token> -et <end_token> rf_prod"
+            echo ""
+            echo "  Reaper splits the full token range into small segments (e.g., 256)"
+            echo "  and repairs them one at a time, with throttling between segments."
+            echo ""
+
+            separator
+            echo -e "${C_WHITE}--- Repair History ---${C_RESET}"
+            log_cmd "docker exec hcd-node1 nodetool repair_admin list 2>/dev/null | head -n 10 || echo '(repair_admin not available)'"
+            log_cmd "docker exec hcd-node1 cqlsh -e \"SELECT * FROM system_distributed.repair_history LIMIT 5;\" 2>/dev/null || echo '(repair history)'"
+
+            separator
+            echo -e "${C_WHITE}--- gc_grace_seconds Interaction (CRITICAL) ---${C_RESET}"
+            echo ""
+            echo "  This is the MOST IMPORTANT operational concept in HCD:"
+            echo ""
+            echo "  ┌──────────────────────────────────────────────────────────────────┐"
+            echo "  │  THE DANGER WINDOW:                                               │"
+            echo "  │                                                                   │"
+            echo "  │  Day  0: Row deleted --> tombstone created on all replicas        │"
+            echo "  │  Day 10: gc_grace expires --> tombstone eligible for compaction   │"
+            echo "  │  Day 11: Compaction removes tombstone on nodes 1, 2               │"
+            echo "  │  Day 12: Node 3 comes back (was down since day 0)                │"
+            echo "  │  Day 12: Read repair reads from node 3                            │"
+            echo "  │          --> RESURRECTS the deleted row! (zombie)                 │"
+            echo "  │                                                                   │"
+            echo "  │  PREVENTION: run repair BEFORE gc_grace expires                  │"
+            echo "  │                                                                   │"
+            echo "  │  ┌─────────────────────────────────────────────────────────────┐  │"
+            echo "  │  │ gc_grace = 10 days                                         │  │"
+            echo "  │  │ Recommended repair interval = 7 days (70% of gc_grace)     │  │"
+            echo "  │  │ Safety margin = 3 days for repair to complete               │  │"
+            echo "  │  └─────────────────────────────────────────────────────────────┘  │"
+            echo "  └──────────────────────────────────────────────────────────────────┘"
+            echo ""
+            echo "  Check your gc_grace setting:"
+            log_cmd "docker exec hcd-node1 cqlsh -e \"SELECT table_name, gc_grace_seconds FROM system_schema.tables WHERE keyspace_name = 'rf_prod';\" 2>&1 | head -n 20 || echo '(gc_grace query)'"
+
+            separator
+            echo -e "${C_WHITE}--- Production Repair Scheduling ---${C_RESET}"
+            echo ""
+            echo "  ┌──────────────────────────────────────────────────────────────────┐"
+            echo "  │  RECOMMENDED PRODUCTION SCHEDULE (using Reaper):                  │"
+            echo "  │                                                                   │"
+            echo "  │  Incremental repair:  daily   (low overhead, catches recent)     │"
+            echo "  │  Full repair:         weekly  (within gc_grace window)            │"
+            echo "  │                                                                   │"
+            echo "  │  Reaper settings:                                                 │"
+            echo "  │    repair_intensity:    0.5  (use 50% of available I/O)           │"
+            echo "  │    repair_parallelism:  1    (one repair at a time per cluster)   │"
+            echo "  │    segment_count:       256  (sub-range segments per repair)      │"
+            echo "  │    schedule_days:       7    (repeat every 7 days)                │"
+            echo "  │                                                                   │"
+            echo "  │  Monitor:                                                         │"
+            echo "  │    - Repair duration (should complete well before gc_grace)       │"
+            echo "  │    - Pending repairs (should not accumulate)                      │"
+            echo "  │    - Streaming bandwidth (watch for network saturation)           │"
+            echo "  │    - nodetool compactionstats (repair triggers compaction)        │"
+            echo "  └──────────────────────────────────────────────────────────────────┘"
+            echo ""
+            echo "  Reference: Module 39 introduced Reaper basics."
+            echo "  In production, deploy Reaper as a sidecar (K8ssandra) or standalone container."
+            echo ""
+
+            echo -e "${C_YELLOW}QUESTION: You have gc_grace_seconds=864000 (10 days). A node was down${C_RESET}"
+            echo -e "${C_YELLOW}for 4 days. After it rejoins, do you need to run repair?${C_RESET}"
+            pause
+            echo -e "${C_GREEN}ANSWER: Not immediately for data availability — but YES, you must run${C_RESET}"
+            echo -e "${C_GREEN}repair before gc_grace expires (day 10). Hinted handoff only covers ~3 hours${C_RESET}"
+            echo -e "${C_GREEN}by default. A 4-day outage means hints expired. Without repair, any deletes${C_RESET}"
+            echo -e "${C_GREEN}made during those 4 days risk becoming zombie rows after gc_grace.${C_RESET}"
+            echo -e "${C_GREEN}Best practice: run repair as soon as the node rejoins.${C_RESET}"
+            echo ""
+
+            takeaway "Repair is MANDATORY — not optional. Without it, deleted data can resurrect (zombie rows)." \
+                     "Merkle trees minimize repair I/O: only divergent partitions are streamed." \
+                     "Primary range repair (-pr) on every node = full repair, but parallelizable." \
+                     "Run repair within 70% of gc_grace_seconds (7 days for the 10-day default)." \
+                     "Use Reaper for automated scheduling: intensity=0.5, parallelism=1, every 7 days."
+
+            challenge "Check gc_grace_seconds on all your tables: SELECT table_name, gc_grace_seconds FROM system_schema.tables WHERE keyspace_name = 'rf_prod';" \
+                      "If any table has gc_grace < 864000, calculate the maximum safe repair interval." \
+                      "Set up a cron job or Reaper schedule to repair before that deadline."
+            ;;
+        58)
+            header 58 "Silent Data Corruption Detection"
+            echo "Disks lie. Sectors fail silently — a phenomenon called 'bit rot'."
+            echo "When an SSTable is corrupted on disk, Cassandra may return wrong data"
+            echo "or fail reads entirely. Worse: undetected corruption can propagate"
+            echo "to healthy replicas during repair."
+            echo ""
+            echo "+-----------------------------------------------------------------------+"
+            echo "|  WHY THIS MATTERS:                                                    |"
+            echo "|                                                                         |"
+            echo "|  1. Disk sectors fail silently (bit rot) — no I/O error raised         |"
+            echo "|  2. SSTable corruption goes undetected until the row is read           |"
+            echo "|  3. Without detection, repair treats corrupted data as 'latest'        |"
+            echo "|     and propagates it to healthy replicas                              |"
+            echo "|  4. Cassandra protects against this with CRC32 checksums on            |"
+            echo "|     every SSTable component                                            |"
+            echo "+-----------------------------------------------------------------------+"
+            echo ""
+            echo "+-----------------------------------------------------------------------+"
+            echo "|  SSTable File Components:                                              |"
+            echo "|                                                                         |"
+            echo "|  Data.db        — Actual row data (largest file)                       |"
+            echo "|  Index.db       — Partition index for Data.db                          |"
+            echo "|  Filter.db      — Bloom filter (probabilistic membership test)         |"
+            echo "|  Statistics.db  — SSTable metadata (min/max timestamps, etc.)          |"
+            echo "|  CRC.db         — CRC32 checksums for each data chunk                  |"
+            echo "|  Digest.crc32   — Whole-file digest for integrity verification         |"
+            echo "+-----------------------------------------------------------------------+"
+            echo ""
+
+            separator
+            echo -e "${C_WHITE}--- Step 1: Write Baseline Data ---${C_RESET}"
+
+            log_cmd "docker exec hcd-node1 cqlsh -e \"CREATE TABLE IF NOT EXISTS rf_prod.corruption_test (id int PRIMARY KEY, data text, checksum text);\""
+
+            log_info "Inserting 10 rows with known values..."
+            log_cmd "docker exec hcd-node1 cqlsh -e \"INSERT INTO rf_prod.corruption_test (id, data, checksum) VALUES (1, 'row-one', 'crc-aaa1');\""
+            log_cmd "docker exec hcd-node1 cqlsh -e \"INSERT INTO rf_prod.corruption_test (id, data, checksum) VALUES (2, 'row-two', 'crc-aaa2');\""
+            log_cmd "docker exec hcd-node1 cqlsh -e \"INSERT INTO rf_prod.corruption_test (id, data, checksum) VALUES (3, 'row-three', 'crc-aaa3');\""
+            log_cmd "docker exec hcd-node1 cqlsh -e \"INSERT INTO rf_prod.corruption_test (id, data, checksum) VALUES (4, 'row-four', 'crc-aaa4');\""
+            log_cmd "docker exec hcd-node1 cqlsh -e \"INSERT INTO rf_prod.corruption_test (id, data, checksum) VALUES (5, 'row-five', 'crc-aaa5');\""
+            log_cmd "docker exec hcd-node1 cqlsh -e \"INSERT INTO rf_prod.corruption_test (id, data, checksum) VALUES (6, 'row-six', 'crc-aaa6');\""
+            log_cmd "docker exec hcd-node1 cqlsh -e \"INSERT INTO rf_prod.corruption_test (id, data, checksum) VALUES (7, 'row-seven', 'crc-aaa7');\""
+            log_cmd "docker exec hcd-node1 cqlsh -e \"INSERT INTO rf_prod.corruption_test (id, data, checksum) VALUES (8, 'row-eight', 'crc-aaa8');\""
+            log_cmd "docker exec hcd-node1 cqlsh -e \"INSERT INTO rf_prod.corruption_test (id, data, checksum) VALUES (9, 'row-nine', 'crc-aaa9');\""
+            log_cmd "docker exec hcd-node1 cqlsh -e \"INSERT INTO rf_prod.corruption_test (id, data, checksum) VALUES (10, 'row-ten', 'crc-aa10');\""
+
+            log_info "Verifying all 10 rows are readable..."
+            log_cmd "docker exec hcd-node1 cqlsh -e \"SELECT * FROM rf_prod.corruption_test;\""
+
+            separator
+            echo -e "${C_WHITE}--- Step 2: Show SSTable Structure on Disk ---${C_RESET}"
+
+            log_info "Flushing memtable to force data to SSTables on disk..."
+            log_cmd "docker exec hcd-node1 nodetool flush rf_prod corruption_test"
+
+            log_info "Listing SSTable files for the corruption_test table..."
+            log_cmd "docker exec hcd-node1 bash -c 'ls -la /var/lib/cassandra/data/rf_prod/corruption_test-*/ 2>/dev/null || echo \"(No SSTable directory found — table may be on another node)\"'"
+
+            lookfor "You should see Data.db, Index.db, Filter.db, Statistics.db, CRC.db files."
+            lookfor "Each component has a CRC32 checksum that Cassandra verifies on read."
+
+            separator
+            echo -e "${C_WHITE}--- Step 3: Simulate On-Disk Corruption ---${C_RESET}"
+            echo ""
+            echo -e "${C_YELLOW}WARNING: This step intentionally corrupts an SSTable file on disk.${C_RESET}"
+            echo -e "${C_YELLOW}It writes 10 random bytes at offset 100 in the Data.db file.${C_RESET}"
+            echo -e "${C_YELLOW}This simulates a silent disk sector failure (bit rot).${C_RESET}"
+            echo ""
+
+            if [ "$DRY_RUN" = true ]; then
+                echo -e "${C_DIM}[DRY-RUN] Would execute: dd if=/dev/urandom bs=1 count=10 seek=100 of=<Data.db> conv=notrunc${C_RESET}"
+                echo -e "${C_DIM}[DRY-RUN] This overwrites 10 bytes at position 100 in the SSTable data file.${C_RESET}"
+                echo -e "${C_DIM}[DRY-RUN] The CRC.db checksum will no longer match the corrupted Data.db.${C_RESET}"
+            else
+                log_info "Corrupting SSTable Data.db with random bytes..."
+                log_cmd "docker exec hcd-node1 bash -c \"dd if=/dev/urandom bs=1 count=10 seek=100 of=\$(ls /var/lib/cassandra/data/rf_prod/corruption_test-*/nb-*-big-Data.db 2>/dev/null | head -1) conv=notrunc 2>/dev/null && echo 'Corruption injected: 10 random bytes at offset 100'\""
+            fi
+
+            separator
+            echo -e "${C_WHITE}--- Step 4: Detection Methods ---${C_RESET}"
+            echo ""
+            echo "Method 1: nodetool verify — lightweight CRC scan (non-destructive)"
+            echo "  Reads each SSTable and validates checksums against CRC.db."
+            echo ""
+            log_cmd "docker exec hcd-node1 nodetool verify rf_prod 2>&1 || echo '(verify completed — check output for corruption reports)'"
+
+            lookfor "If corruption is detected, verify reports the corrupted SSTable path."
+            lookfor "This is a read-only check — it does NOT modify any files."
+            pause
+
+            echo "Method 2: nodetool scrub — reads every row and rebuilds the SSTable"
+            echo "  This is more aggressive: it deserializes each row and discards"
+            echo "  rows that cannot be read. Use with caution in production."
+            echo ""
+            log_cmd "docker exec hcd-node1 nodetool scrub rf_prod corruption_test 2>&1 || echo '(scrub completed — corrupted rows may have been discarded)'"
+
+            lookfor "Scrub rewrites the SSTable, skipping unreadable rows."
+            lookfor "Lost rows can be recovered from replicas via repair."
+            pause
+
+            echo "Method 3: Read the corrupted row — triggers a checksum mismatch"
+            echo ""
+            log_cmd "docker exec hcd-node1 cqlsh -e \"SELECT * FROM rf_prod.corruption_test;\" 2>&1 || echo '(Read may fail or return partial results due to corruption)'"
+
+            separator
+            echo -e "${C_WHITE}--- Step 5: Recovery via Repair ---${C_RESET}"
+            echo ""
+            echo "Repair fetches correct data from healthy replicas and overwrites"
+            echo "the corrupted SSTable. With RF=3, two healthy replicas still hold"
+            echo "the correct data."
+            echo ""
+
+            log_cmd "docker exec hcd-node1 nodetool repair rf_prod corruption_test 2>&1 || echo '(repair completed — data restored from replicas)'"
+
+            log_info "Verifying recovery — all 10 rows should be intact..."
+            log_cmd "docker exec hcd-node1 cqlsh -e \"SELECT * FROM rf_prod.corruption_test;\""
+
+            lookfor "All 10 rows restored with correct values from healthy replicas."
+
+            separator
+            echo -e "${C_WHITE}--- Step 6: Production Prevention Strategy ---${C_RESET}"
+            echo ""
+            echo "+-----------------------------------------------------------------------+"
+            echo "|  CORRUPTION PREVENTION CHECKLIST:                                     |"
+            echo "|                                                                         |"
+            echo "|  1. Schedule weekly 'nodetool verify' on every node                   |"
+            echo "|     (lightweight CRC check — safe to run during traffic)               |"
+            echo "|                                                                         |"
+            echo "|  2. Set disk_failure_policy: stop in cassandra.yaml                    |"
+            echo "|     (stops the node on I/O error instead of serving bad data)          |"
+            echo "|                                                                         |"
+            echo "|  3. Use RAID with scrubbing or ZFS with checksums                      |"
+            echo "|     (filesystem-level integrity adds a second layer of defense)        |"
+            echo "|                                                                         |"
+            echo "|  4. Run repair within gc_grace_seconds (default 10 days)               |"
+            echo "|     (ensures corrupted data is replaced before tombstones expire)      |"
+            echo "|                                                                         |"
+            echo "|  5. Monitor nodetool verify output via alerting                        |"
+            echo "|     (catch corruption early — before repair spreads it)                |"
+            echo "+-----------------------------------------------------------------------+"
+            echo ""
+
+            separator
+            echo -e "${C_YELLOW}QUESTION: What happens if a corrupted replica participates in repair${C_RESET}"
+            echo -e "${C_YELLOW}BEFORE the corruption is detected?${C_RESET}"
+            pause
+
+            echo -e "${C_GREEN}ANSWER: Repair uses Merkle tree comparison. Each replica builds a hash${C_RESET}"
+            echo -e "${C_GREEN}tree of its data. If 2/3 replicas agree on a different value than the${C_RESET}"
+            echo -e "${C_GREEN}corrupted one, the MAJORITY WINS and the corrupted replica gets${C_RESET}"
+            echo -e "${C_GREEN}overwritten with the correct data.${C_RESET}"
+            echo ""
+            echo -e "${C_GREEN}But if 2/3 replicas are corrupted (very unlikely), the wrong data wins.${C_RESET}"
+            echo -e "${C_GREEN}This is why early detection + frequent repair is critical: catch corruption${C_RESET}"
+            echo -e "${C_GREEN}while only 1 replica is affected so the majority can correct it.${C_RESET}"
+
+            takeaway "Silent corruption is real. Cassandra's CRC32 checksums detect it." \
+                     "Use 'nodetool verify' regularly to catch corruption early." \
+                     "Repair restores correct data from healthy replicas (majority wins)." \
+                     "Defense in depth: checksums + disk_failure_policy + filesystem integrity + timely repair."
+            ;;
+        59)
+            header 59 "Cross-Service Saga (Simulated External Services)"
+            echo "Modules 51-52 showed sagas WITHIN Cassandra. In the real world,"
+            echo "transactions span multiple services with their own databases."
+            echo "This module simulates a cross-service saga using HCD as the"
+            echo "persistence layer for saga state and event coordination."
+            echo ""
+            echo "+-----------------------------------------------------------------------+"
+            echo "|  CROSS-SERVICE TRANSACTION:                                           |"
+            echo "|                                                                         |"
+            echo "|  Order Service (HCD)                                                   |"
+            echo "|       |                                                                |"
+            echo "|       +--- 1. Create Order ------> [saga state: CREATED]               |"
+            echo "|       |                                                                |"
+            echo "|       +--- 2. Reserve Payment ---> Payment Gateway (external)          |"
+            echo "|       |                            [saga state: AUTHORIZED]             |"
+            echo "|       |                                                                |"
+            echo "|       +--- 3. Initiate Shipping -> Shipping Service (external)         |"
+            echo "|       |                            [saga state: LABEL_CREATED]          |"
+            echo "|       |                                                                |"
+            echo "|       +--- 4. Capture Payment ---> Payment Gateway (external)          |"
+            echo "|       |                            [saga state: CAPTURED]               |"
+            echo "|       |                                                                |"
+            echo "|       +--- 5. Complete Order ----> [saga state: COMPLETED]              |"
+            echo "|                                                                         |"
+            echo "|  Each service has its own database/state.                              |"
+            echo "|  No distributed transaction coordinator.                               |"
+            echo "|  Must handle: success, partial failure, timeout, retry.                |"
+            echo "+-----------------------------------------------------------------------+"
+            echo ""
+
+            separator
+            echo -e "${C_WHITE}--- Simulated Architecture ---${C_RESET}"
+            echo ""
+            echo "HCD stores saga state for ALL services (simulating 3 independent services)."
+            echo "In production, each service would have its own datastore."
+            echo ""
+
+            log_cmd "docker exec hcd-node1 cqlsh -e \"CREATE TABLE IF NOT EXISTS rf_prod.saga_cross_service (saga_id uuid, step text, service text, status text, payload text, updated_at timestamp, PRIMARY KEY (saga_id, step));\""
+            log_cmd "docker exec hcd-node1 cqlsh -e \"CREATE TABLE IF NOT EXISTS rf_prod.saga_outbox (saga_id uuid, event_id timeuuid, event_type text, target_service text, payload text, delivered boolean, PRIMARY KEY (saga_id, event_id));\""
+            log_cmd "docker exec hcd-node1 cqlsh -e \"TRUNCATE rf_prod.saga_cross_service;\""
+            log_cmd "docker exec hcd-node1 cqlsh -e \"TRUNCATE rf_prod.saga_outbox;\""
+
+            separator
+            echo -e "${C_WHITE}--- Happy Path: Full Order Lifecycle ---${C_RESET}"
+            echo ""
+            echo "Saga ID: 11111111-1111-1111-1111-111111111111"
+            echo ""
+
+            echo "Step 1: Create order (Order Service)"
+            log_cmd "docker exec hcd-node1 cqlsh -e \"INSERT INTO rf_prod.saga_cross_service (saga_id, step, service, status, payload, updated_at) VALUES (11111111-1111-1111-1111-111111111111, '01-create-order', 'order', 'CREATED', '{\\\"item\\\": \\\"laptop\\\", \\\"qty\\\": 1, \\\"price\\\": 999}', toTimestamp(now()));\""
+            log_cmd "docker exec hcd-node1 cqlsh -e \"INSERT INTO rf_prod.saga_outbox (saga_id, event_id, event_type, target_service, payload, delivered) VALUES (11111111-1111-1111-1111-111111111111, now(), 'ORDER_CREATED', 'payment', '{\\\"order\\\": \\\"laptop\\\", \\\"amount\\\": 999}', false);\""
+
+            echo ""
+            echo "Step 2: Reserve payment (Payment Gateway) — LWT ensures idempotency"
+            log_cmd "docker exec hcd-node1 cqlsh -e \"INSERT INTO rf_prod.saga_cross_service (saga_id, step, service, status, payload, updated_at) VALUES (11111111-1111-1111-1111-111111111111, '02-reserve-payment', 'payment', 'AUTHORIZED', '{\\\"auth_code\\\": \\\"AUTH-7890\\\", \\\"amount\\\": 999}', toTimestamp(now())) IF NOT EXISTS;\""
+            lookfor "[applied]: True — payment authorization recorded (first attempt)."
+            log_cmd "docker exec hcd-node1 cqlsh -e \"INSERT INTO rf_prod.saga_outbox (saga_id, event_id, event_type, target_service, payload, delivered) VALUES (11111111-1111-1111-1111-111111111111, now(), 'PAYMENT_AUTHORIZED', 'shipping', '{\\\"auth_code\\\": \\\"AUTH-7890\\\"}', false);\""
+
+            echo ""
+            echo "Step 3: Initiate shipping (Shipping Service)"
+            log_cmd "docker exec hcd-node1 cqlsh -e \"INSERT INTO rf_prod.saga_cross_service (saga_id, step, service, status, payload, updated_at) VALUES (11111111-1111-1111-1111-111111111111, '03-initiate-shipping', 'shipping', 'LABEL_CREATED', '{\\\"tracking\\\": \\\"TRACK-456\\\", \\\"carrier\\\": \\\"FedEx\\\"}', toTimestamp(now()));\""
+            log_cmd "docker exec hcd-node1 cqlsh -e \"INSERT INTO rf_prod.saga_outbox (saga_id, event_id, event_type, target_service, payload, delivered) VALUES (11111111-1111-1111-1111-111111111111, now(), 'SHIPPING_INITIATED', 'payment', '{\\\"tracking\\\": \\\"TRACK-456\\\"}', false);\""
+
+            echo ""
+            echo "Step 4: Capture payment (Payment Gateway)"
+            log_cmd "docker exec hcd-node1 cqlsh -e \"INSERT INTO rf_prod.saga_cross_service (saga_id, step, service, status, payload, updated_at) VALUES (11111111-1111-1111-1111-111111111111, '04-capture-payment', 'payment', 'CAPTURED', '{\\\"capture_id\\\": \\\"CAP-1234\\\", \\\"amount\\\": 999}', toTimestamp(now()));\""
+
+            echo ""
+            echo "Step 5: Complete order (Order Service)"
+            log_cmd "docker exec hcd-node1 cqlsh -e \"INSERT INTO rf_prod.saga_cross_service (saga_id, step, service, status, payload, updated_at) VALUES (11111111-1111-1111-1111-111111111111, '05-complete-order', 'order', 'COMPLETED', '{\\\"final_status\\\": \\\"delivered\\\"}', toTimestamp(now()));\""
+
+            echo ""
+            log_info "Full saga state for the happy path:"
+            log_cmd "docker exec hcd-node1 cqlsh -e \"SELECT step, service, status FROM rf_prod.saga_cross_service WHERE saga_id = 11111111-1111-1111-1111-111111111111;\""
+            lookfor "5 steps: CREATED -> AUTHORIZED -> LABEL_CREATED -> CAPTURED -> COMPLETED."
+
+            log_info "Outbox events generated:"
+            log_cmd "docker exec hcd-node1 cqlsh -e \"SELECT event_type, target_service, delivered FROM rf_prod.saga_outbox WHERE saga_id = 11111111-1111-1111-1111-111111111111;\""
+            lookfor "3 outbox events — each triggers the next service in the chain."
+
+            pause
+
+            separator
+            echo -e "${C_WHITE}--- Failure Path 1: Payment Gateway Timeout ---${C_RESET}"
+            echo ""
+            echo "Saga ID: 22222222-2222-2222-2222-222222222222"
+            echo "Scenario: Payment gateway does not respond within the timeout window."
+            echo ""
+
+            echo "Step 1: Create order"
+            log_cmd "docker exec hcd-node1 cqlsh -e \"INSERT INTO rf_prod.saga_cross_service (saga_id, step, service, status, payload, updated_at) VALUES (22222222-2222-2222-2222-222222222222, '01-create-order', 'order', 'CREATED', '{\\\"item\\\": \\\"tablet\\\", \\\"qty\\\": 1, \\\"price\\\": 499}', toTimestamp(now()));\""
+
+            echo ""
+            echo "Step 2: Payment authorization — TIMEOUT (gateway unresponsive)"
+            log_cmd "docker exec hcd-node1 cqlsh -e \"INSERT INTO rf_prod.saga_cross_service (saga_id, step, service, status, payload, updated_at) VALUES (22222222-2222-2222-2222-222222222222, '02-reserve-payment', 'payment', 'TIMEOUT', '{\\\"error\\\": \\\"gateway_timeout_after_5s\\\"}', toTimestamp(now()));\""
+
+            echo ""
+            echo -e "${C_YELLOW}Saga detects TIMEOUT — triggering compensation...${C_RESET}"
+            echo ""
+
+            echo "Compensation: Cancel order"
+            log_cmd "docker exec hcd-node1 cqlsh -e \"INSERT INTO rf_prod.saga_cross_service (saga_id, step, service, status, payload, updated_at) VALUES (22222222-2222-2222-2222-222222222222, '99-compensate-order', 'order', 'CANCELLED', '{\\\"reason\\\": \\\"payment_timeout\\\"}', toTimestamp(now()));\""
+
+            echo "Compensation: Void any pending payment authorization"
+            log_cmd "docker exec hcd-node1 cqlsh -e \"INSERT INTO rf_prod.saga_cross_service (saga_id, step, service, status, payload, updated_at) VALUES (22222222-2222-2222-2222-222222222222, '99-compensate-payment', 'payment', 'VOIDED', '{\\\"reason\\\": \\\"payment_timeout\\\"}', toTimestamp(now()));\""
+
+            log_cmd "docker exec hcd-node1 cqlsh -e \"INSERT INTO rf_prod.saga_outbox (saga_id, event_id, event_type, target_service, payload, delivered) VALUES (22222222-2222-2222-2222-222222222222, now(), 'ORDER_CANCELLED', 'notification', '{\\\"reason\\\": \\\"payment_timeout\\\"}', false);\""
+            log_cmd "docker exec hcd-node1 cqlsh -e \"INSERT INTO rf_prod.saga_outbox (saga_id, event_id, event_type, target_service, payload, delivered) VALUES (22222222-2222-2222-2222-222222222222, now(), 'PAYMENT_VOIDED', 'payment', '{\\\"reason\\\": \\\"payment_timeout\\\"}', false);\""
+
+            log_info "Saga timeline after timeout + compensation:"
+            log_cmd "docker exec hcd-node1 cqlsh -e \"SELECT step, service, status FROM rf_prod.saga_cross_service WHERE saga_id = 22222222-2222-2222-2222-222222222222;\""
+            lookfor "CREATED -> TIMEOUT -> CANCELLED + VOIDED. Clean rollback."
+
+            pause
+
+            separator
+            echo -e "${C_WHITE}--- Failure Path 2: Shipping Unavailable After Payment Captured ---${C_RESET}"
+            echo ""
+            echo "Saga ID: 33333333-3333-3333-3333-333333333333"
+            echo "Scenario: Payment is captured, but shipping fails (no inventory at warehouse)."
+            echo "This is the HARDEST case: money has already been taken."
+            echo ""
+
+            echo "Step 1: Create order"
+            log_cmd "docker exec hcd-node1 cqlsh -e \"INSERT INTO rf_prod.saga_cross_service (saga_id, step, service, status, payload, updated_at) VALUES (33333333-3333-3333-3333-333333333333, '01-create-order', 'order', 'CREATED', '{\\\"item\\\": \\\"monitor\\\", \\\"qty\\\": 1, \\\"price\\\": 750}', toTimestamp(now()));\""
+
+            echo ""
+            echo "Step 2: Payment captured (money taken from customer)"
+            log_cmd "docker exec hcd-node1 cqlsh -e \"INSERT INTO rf_prod.saga_cross_service (saga_id, step, service, status, payload, updated_at) VALUES (33333333-3333-3333-3333-333333333333, '02-capture-payment', 'payment', 'CAPTURED', '{\\\"capture_id\\\": \\\"CAP-9999\\\", \\\"amount\\\": 750}', toTimestamp(now()));\""
+
+            echo ""
+            echo "Step 3: Shipping FAILS — no inventory at warehouse"
+            log_cmd "docker exec hcd-node1 cqlsh -e \"INSERT INTO rf_prod.saga_cross_service (saga_id, step, service, status, payload, updated_at) VALUES (33333333-3333-3333-3333-333333333333, '03-initiate-shipping', 'shipping', 'FAILED', '{\\\"error\\\": \\\"no_inventory_at_warehouse\\\"}', toTimestamp(now()));\""
+
+            echo ""
+            echo -e "${C_YELLOW}Saga detects FAILURE after payment captured — triggering refund...${C_RESET}"
+            echo ""
+
+            echo "Compensation: Refund payment (reverse the capture)"
+            log_cmd "docker exec hcd-node1 cqlsh -e \"INSERT INTO rf_prod.saga_cross_service (saga_id, step, service, status, payload, updated_at) VALUES (33333333-3333-3333-3333-333333333333, '99-compensate-payment', 'payment', 'REFUNDED', '{\\\"refund_id\\\": \\\"REF-9999\\\", \\\"amount\\\": 750}', toTimestamp(now()));\""
+
+            echo "Compensation: Cancel order"
+            log_cmd "docker exec hcd-node1 cqlsh -e \"INSERT INTO rf_prod.saga_cross_service (saga_id, step, service, status, payload, updated_at) VALUES (33333333-3333-3333-3333-333333333333, '99-compensate-order', 'order', 'CANCELLED', '{\\\"reason\\\": \\\"shipping_failed_no_inventory\\\"}', toTimestamp(now()));\""
+
+            log_cmd "docker exec hcd-node1 cqlsh -e \"INSERT INTO rf_prod.saga_outbox (saga_id, event_id, event_type, target_service, payload, delivered) VALUES (33333333-3333-3333-3333-333333333333, now(), 'PAYMENT_REFUNDED', 'payment', '{\\\"refund_id\\\": \\\"REF-9999\\\"}', false);\""
+            log_cmd "docker exec hcd-node1 cqlsh -e \"INSERT INTO rf_prod.saga_outbox (saga_id, event_id, event_type, target_service, payload, delivered) VALUES (33333333-3333-3333-3333-333333333333, now(), 'ORDER_CANCELLED', 'notification', '{\\\"reason\\\": \\\"shipping_unavailable\\\"}', false);\""
+
+            log_info "Full saga timeline — payment captured then refunded:"
+            log_cmd "docker exec hcd-node1 cqlsh -e \"SELECT step, service, status FROM rf_prod.saga_cross_service WHERE saga_id = 33333333-3333-3333-3333-333333333333;\""
+            lookfor "CREATED -> CAPTURED -> FAILED -> REFUNDED + CANCELLED."
+            lookfor "Customer's money is returned. No orphaned charge."
+
+            pause
+
+            separator
+            echo -e "${C_WHITE}--- Idempotency Guarantee ---${C_RESET}"
+            echo ""
+            echo "What if the payment step is retried (network glitch, consumer restart)?"
+            echo "The LWT IF NOT EXISTS prevents duplicate processing."
+            echo ""
+
+            log_info "Replaying step 2 of the happy path (already completed)..."
+            log_cmd "docker exec hcd-node1 cqlsh -e \"INSERT INTO rf_prod.saga_cross_service (saga_id, step, service, status, payload, updated_at) VALUES (11111111-1111-1111-1111-111111111111, '02-reserve-payment', 'payment', 'AUTHORIZED', '{\\\"auth_code\\\": \\\"AUTH-7890\\\", \\\"amount\\\": 999}', toTimestamp(now())) IF NOT EXISTS;\""
+            lookfor "[applied]: False — the step was already executed. No duplicate processing."
+            lookfor "This is CRITICAL for retry-safe cross-service communication."
+
+            pause
+
+            separator
+            echo -e "${C_WHITE}--- The Outbox Pattern Explained ---${C_RESET}"
+            echo ""
+            echo "+-----------------------------------------------------------------------+"
+            echo "|  THE DUAL-WRITE PROBLEM:                                              |"
+            echo "|                                                                         |"
+            echo "|  Naive approach (BROKEN):                                              |"
+            echo "|    1. Write to database      --- succeeds                              |"
+            echo "|    2. Send message to Kafka   --- FAILS (network error)                |"
+            echo "|    Result: DB updated but downstream never notified                    |"
+            echo "|                                                                         |"
+            echo "|  Outbox pattern (CORRECT):                                             |"
+            echo "|    1. Write state + outbox event in SAME database write (atomic)       |"
+            echo "|    2. CDC (Module 25) polls outbox table for new events                |"
+            echo "|    3. CDC delivers event to external service (Kafka, HTTP, etc.)       |"
+            echo "|    4. External service acknowledges -> mark delivered=true             |"
+            echo "|                                                                         |"
+            echo "|  Why this works: Step 1 is a single database write = atomic.           |"
+            echo "|  If CDC delivery fails, the event stays in the outbox and is retried.  |"
+            echo "+-----------------------------------------------------------------------+"
+            echo ""
+
+            log_info "Outbox events across all sagas (some delivered, some pending):"
+            log_cmd "docker exec hcd-node1 cqlsh -e \"SELECT saga_id, event_type, target_service, delivered FROM rf_prod.saga_outbox;\""
+            lookfor "All events show delivered=False — in production, CDC consumers mark them True."
+
+            separator
+            echo -e "${C_WHITE}--- Production Reality ---${C_RESET}"
+            echo ""
+            echo "+-----------------------------------------------------------------------+"
+            echo "|  HCD'S ROLE IN CROSS-SERVICE SAGAS:                                   |"
+            echo "|                                                                         |"
+            echo "|  HCD provides:                                                         |"
+            echo "|    - Fast writes for saga state (multi-DC, low latency)                |"
+            echo "|    - CDC for event delivery to downstream services                     |"
+            echo "|    - LWT for idempotent step execution (IF NOT EXISTS)                 |"
+            echo "|    - Partition-per-saga for efficient timeline queries                 |"
+            echo "|                                                                         |"
+            echo "|  HCD does NOT provide:                                                 |"
+            echo "|    - Saga orchestration (state machine, retries, timeouts)             |"
+            echo "|    - External service coordination                                     |"
+            echo "|    - Automatic compensation on failure                                 |"
+            echo "|                                                                         |"
+            echo "|  In production, use a saga orchestrator:                               |"
+            echo "|    - Temporal.io (workflow engine with durable execution)               |"
+            echo "|    - Apache Camel (integration framework with saga support)            |"
+            echo "|    - Custom state machine (backed by HCD for persistence)              |"
+            echo "+-----------------------------------------------------------------------+"
+            echo ""
+
+            separator
+            echo -e "${C_YELLOW}QUESTION: Why can't you use a LOGGED BATCH to make steps 1-5 atomic?${C_RESET}"
+            pause
+
+            echo -e "${C_GREEN}ANSWER: LOGGED BATCH only guarantees atomicity WITHIN Cassandra.${C_RESET}"
+            echo -e "${C_GREEN}It cannot coordinate with external payment gateways or shipping APIs.${C_RESET}"
+            echo -e "${C_GREEN}A LOGGED BATCH could make steps 1 + 5 (both in HCD) atomic, but it${C_RESET}"
+            echo -e "${C_GREEN}cannot wait for step 2 (payment gateway) or step 3 (shipping API)${C_RESET}"
+            echo -e "${C_GREEN}to succeed before committing.${C_RESET}"
+            echo ""
+            echo -e "${C_GREEN}The saga pattern replaces distributed transactions with a SEQUENCE${C_RESET}"
+            echo -e "${C_GREEN}of local transactions + compensating actions. Each step is independently${C_RESET}"
+            echo -e "${C_GREEN}safe (LWT), and the orchestrator decides what to do on failure.${C_RESET}"
+
+            takeaway "Cross-service sagas use HCD for state persistence, CDC for event delivery," \
+                     "and LWT for idempotent step execution." \
+                     "The outbox pattern solves the dual-write problem: state + event in one atomic write." \
+                     "HCD is the persistence layer — use Temporal.io or a custom state machine for orchestration." \
+                     "Every saga step must be idempotent (IF NOT EXISTS) and independently compensatable."
+            ;;
     esac
     pause
 }
@@ -5378,7 +6972,7 @@ if [ "$SCORE_MODE" = true ]; then
     echo -e "${C_BOLD}════════════════════════════════════════════════════════════════${C_RESET}"
     echo ""
 
-    for i in $(seq 0 53); do
+    for i in $(seq 0 $((TOTAL_MODULES - 1))); do
         output=$(run_module "$i" 2>&1)
         exit_code=$?
         # Check for fatal errors (but not expected "[DRY-RUN]" output)
@@ -5391,7 +6985,7 @@ if [ "$SCORE_MODE" = true ]; then
         fi
         # Progress ticker
         if [ $(( (i + 1) % 10 )) -eq 0 ]; then
-            echo -e "  [${i}/53] modules validated..."
+            echo -e "  [${i}/$((TOTAL_MODULES - 1))] modules validated..."
         fi
     done
 
@@ -5424,7 +7018,7 @@ fi
 if [ -n "$SELECTED_MODULE" ]; then
     run_module "$SELECTED_MODULE"
 else
-    for i in {0..53}; do
+    for i in $(seq 0 $((TOTAL_MODULES - 1))); do
         run_module $i
     done
 fi

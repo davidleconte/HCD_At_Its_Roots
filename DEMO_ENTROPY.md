@@ -1,13 +1,13 @@
 # HCD Entropy & Consistency Didactic Demo
 **Grade: A+ (97/100)**
 
-> **Executive Summary:** A 54-module interactive demo proving that IBM HCD delivers zero-downtime resilience, automatic self-healing, and tunable consistency across datacenters. Designed for live stakeholder presentations and hands-on engineering onboarding.
+> **Executive Summary:** A 62-module interactive demo proving that IBM HCD delivers zero-downtime resilience, automatic self-healing, and tunable consistency across datacenters. Designed for live stakeholder presentations and hands-on engineering onboarding.
 >
 > **Why this matters:** Unplanned database downtime costs enterprises $5,600-$9,000 per minute (Gartner). This demo proves — live, on your laptop — that HCD survives datacenter-level failures with zero data loss and zero application errors, eliminating the single largest source of availability risk in distributed data infrastructure.
 
 | | |
 |---|---|
-| **Modules** | 54 (0-53), organized in 6 parts |
+| **Modules** | 62 (0-61), organized in 7 parts |
 | **Cluster** | 6 nodes, 2 DCs, RF=3 per DC |
 | **Time (interactive)** | ~3-4 hours (full), ~20 min per part |
 | **Time (non-interactive)** | ~60-90 minutes |
@@ -31,7 +31,7 @@
     make demo                        # full interactive demo
     ./scripts/demo-entropy.sh 23     # jump to a specific module
     ./scripts/demo-entropy.sh --dry-run --no-pause  # dry-run, no cluster needed
-    ./scripts/demo-entropy.sh --score              # validate all 54 modules (scorecard)
+    ./scripts/demo-entropy.sh --score              # validate all 62 modules (scorecard)
     ```
     > **Single-module execution:** When jumping to Module N > 1, the script auto-creates the `rf_prod` keyspace via `ensure_rf_prod()` so prerequisites are satisfied.
 
@@ -167,7 +167,7 @@ This demo uses a 6-node, multi-DC cluster simulated in Docker.
 | 44 | Speculative Execution | Interactive Q + p99 drops to ~p50 with backup requests |
 | 45 | Live DC Failover with Driver (~3-5 min) | Zero errors during DC kill, RPO=0/RTO=1-3s |
 | 46 | Retry Policies Under Partition | pause+disconnect dual failure, 3 policies compared |
-| 47 | Demo Summary Dashboard | Visual recap of all 54 modules |
+| 47 | Demo Summary Dashboard | Visual recap of all 62 modules |
 
 #### Part 6 — Transactions & Patterns (Modules 48-53)
 | Module | Title | Key Proof |
@@ -178,6 +178,18 @@ This demo uses a 6-node, multi-DC cluster simulated in Docker.
 | 51 | Banking: Instant Payment | LWT debit + CDC credit, money conserved + SOX/PCI-DSS/PSD2 compliance |
 | 52 | Saga Pattern: Order Flow | Compensating transactions release inventory |
 | 53 | Consistency Decision Framework | Decision tree, golden rules, evidence-based positioning framework |
+
+#### Part 7 — Enterprise (Modules 54-61)
+| Module | Title | Key Proof |
+|--------|-------|-----------|
+| 54 | HCD Data API | REST/JSON document access via HTTP:8181, Postman collection, insertOne/find/update/delete |
+| 55 | Multi-Tenant Isolation | Tenant ID partition key, RBAC per tenant, GDPR erasure, DC affinity |
+| 56 | Node Decommission | Controlled shrink, drain+stop, data verification, decommission vs removenode vs assassinate |
+| 57 | Disaster Recovery Runbook | Coordinated multi-node snapshot, truncate+restore, commitlog archival, Medusa |
+| 58 | Silent Data Corruption | SSTable CRC corruption, nodetool verify/scrub detection, repair recovery |
+| 59 | Cross-Service Saga | Outbox pattern, payment timeout compensation, shipping failure refund, idempotency |
+| 60 | LWT Contention Under Load | 5 concurrent writers, Paxos 4-phase tracing, mitigation strategies |
+| 61 | Repair Deep-Dive | Merkle tree visualization, gc_grace zombie rows, 4 repair modes, production scheduling |
 
 ## Cleanup
 
@@ -1598,7 +1610,7 @@ This ensures the driver encounters both timeout and unavailable exceptions, maki
 
 A visual recap of everything covered in the demo, presented as an ASCII dashboard showing:
 
-- **Total modules**: 54 (0-53)
+- **Total modules**: 62 (0-61)
 - **What was proved**: Zero data loss during node/DC failure, automatic self-healing, LWW conflict resolution, rolling restart with zero downtime, automatic driver DC failover, p99 latency masking, safe banking transfers, saga compensation
 - **Topics covered**: Core, Indexing (SAI), Write Path, Multi-DC, Ops, Security, Data Modeling, Driver Policies, Transactions (ACID, Batches, LWT, Sagas)
 - **Key production takeaways**: LOCAL_QUORUM, TokenAwarePolicy, used_hosts_per_remote_dc, weekly repair, partition key design, monitoring, PasswordAuthenticator
