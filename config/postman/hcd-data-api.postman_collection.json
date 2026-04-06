@@ -1,0 +1,361 @@
+{
+  "info": {
+    "name": "HCD Data API",
+    "description": "Complete collection for testing the HCD Data API (Stargate JSON API).\n\nPrerequisites:\n1. HCD cluster running: `make up`\n2. Data API running: `make api`\n3. Data API available at http://localhost:8181\n\nRun requests in order: Create Namespace → Create Collection → Insert → Find → Update → Delete.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8181",
+      "type": "string"
+    },
+    {
+      "key": "namespace",
+      "value": "data_api_demo",
+      "type": "string"
+    },
+    {
+      "key": "collection",
+      "value": "products",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Setup",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/stargate/health",
+            "description": "Verify the Data API service is running and healthy."
+          }
+        },
+        {
+          "name": "Create Namespace",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/v1",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"createNamespace\": {\n    \"name\": \"{{namespace}}\",\n    \"options\": {\n      \"replication\": {\n        \"class\": \"NetworkTopologyStrategy\",\n        \"dc1\": 3,\n        \"dc2\": 3\n      }\n    }\n  }\n}"
+            },
+            "description": "Create a namespace (keyspace) with NetworkTopologyStrategy replication."
+          }
+        },
+        {
+          "name": "Create Collection",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/v1/{{namespace}}",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"createCollection\": {\n    \"name\": \"{{collection}}\"\n  }\n}"
+            },
+            "description": "Create a collection (table) within the namespace."
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Insert Documents",
+      "item": [
+        {
+          "name": "Insert One - ThinkPad X1",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/v1/{{namespace}}/{{collection}}",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"insertOne\": {\n    \"document\": {\n      \"_id\": \"prod-001\",\n      \"name\": \"ThinkPad X1 Carbon Gen 11\",\n      \"brand\": \"Lenovo\",\n      \"category\": \"laptop\",\n      \"price\": 1299.99,\n      \"in_stock\": true,\n      \"specs\": {\n        \"cpu\": \"i7-1365U\",\n        \"ram\": \"16GB\",\n        \"storage\": \"512GB SSD\"\n      },\n      \"tags\": [\"business\", \"ultrabook\", \"14-inch\"]\n    }\n  }\n}"
+            },
+            "description": "Insert a single product document with nested specs and tags array."
+          }
+        },
+        {
+          "name": "Insert Many - MacBook + Galaxy",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/v1/{{namespace}}/{{collection}}",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"insertMany\": {\n    \"documents\": [\n      {\n        \"_id\": \"prod-002\",\n        \"name\": \"MacBook Air M3\",\n        \"brand\": \"Apple\",\n        \"category\": \"laptop\",\n        \"price\": 1099.00,\n        \"in_stock\": true,\n        \"specs\": {\n          \"cpu\": \"M3\",\n          \"ram\": \"8GB\",\n          \"storage\": \"256GB SSD\"\n        },\n        \"tags\": [\"consumer\", \"ultrabook\", \"13-inch\"]\n      },\n      {\n        \"_id\": \"prod-003\",\n        \"name\": \"Galaxy S24 Ultra\",\n        \"brand\": \"Samsung\",\n        \"category\": \"phone\",\n        \"price\": 1199.99,\n        \"in_stock\": false,\n        \"specs\": {\n          \"cpu\": \"Snapdragon 8 Gen 3\",\n          \"ram\": \"12GB\",\n          \"storage\": \"256GB\"\n        },\n        \"tags\": [\"flagship\", \"android\", \"6.8-inch\"]\n      }\n    ]\n  }\n}"
+            },
+            "description": "Insert multiple documents in a single request (batch insert)."
+          }
+        },
+        {
+          "name": "Insert One - Pixel 8 Pro",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/v1/{{namespace}}/{{collection}}",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"insertOne\": {\n    \"document\": {\n      \"_id\": \"prod-004\",\n      \"name\": \"Pixel 8 Pro\",\n      \"brand\": \"Google\",\n      \"category\": \"phone\",\n      \"price\": 899.00,\n      \"in_stock\": true,\n      \"specs\": {\n        \"cpu\": \"Tensor G3\",\n        \"ram\": \"12GB\",\n        \"storage\": \"128GB\"\n      },\n      \"tags\": [\"flagship\", \"android\", \"6.7-inch\", \"AI\"]\n    }\n  }\n}"
+            }
+          }
+        },
+        {
+          "name": "Insert One - Dell Monitor",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/v1/{{namespace}}/{{collection}}",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"insertOne\": {\n    \"document\": {\n      \"_id\": \"prod-005\",\n      \"name\": \"Dell UltraSharp 32 4K\",\n      \"brand\": \"Dell\",\n      \"category\": \"monitor\",\n      \"price\": 649.99,\n      \"in_stock\": true,\n      \"specs\": {\n        \"resolution\": \"4K\",\n        \"panel\": \"IPS\",\n        \"size\": \"32-inch\"\n      },\n      \"tags\": [\"professional\", \"USB-C\", \"HDR\"]\n    }\n  }\n}"
+            }
+          }
+        },
+        {
+          "name": "Insert One - iPad Pro M4",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/v1/{{namespace}}/{{collection}}",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"insertOne\": {\n    \"document\": {\n      \"_id\": \"prod-006\",\n      \"name\": \"iPad Pro M4\",\n      \"brand\": \"Apple\",\n      \"category\": \"tablet\",\n      \"price\": 1099.00,\n      \"in_stock\": true,\n      \"specs\": {\n        \"cpu\": \"M4\",\n        \"ram\": \"8GB\",\n        \"storage\": \"256GB\"\n      },\n      \"tags\": [\"creative\", \"tablet\", \"11-inch\"]\n    }\n  }\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Find Documents",
+      "item": [
+        {
+          "name": "Find All",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/v1/{{namespace}}/{{collection}}",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"find\": {}\n}"
+            },
+            "description": "Retrieve all documents in the collection."
+          }
+        },
+        {
+          "name": "Find by Brand (Apple)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/v1/{{namespace}}/{{collection}}",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"find\": {\n    \"filter\": {\n      \"brand\": \"Apple\"\n    }\n  }\n}"
+            },
+            "description": "Find all Apple products (MacBook Air + iPad Pro)."
+          }
+        },
+        {
+          "name": "Find Laptops Under $1200",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/v1/{{namespace}}/{{collection}}",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"find\": {\n    \"filter\": {\n      \"category\": \"laptop\",\n      \"price\": { \"$lt\": 1200 }\n    }\n  }\n}"
+            },
+            "description": "Composable filter: category=laptop AND price<1200. Only MacBook Air."
+          }
+        },
+        {
+          "name": "Find In-Stock Phones",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/v1/{{namespace}}/{{collection}}",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"find\": {\n    \"filter\": {\n      \"category\": \"phone\",\n      \"in_stock\": true\n    }\n  }\n}"
+            },
+            "description": "Boolean + equality filter: in-stock phones. Only Pixel 8 Pro."
+          }
+        },
+        {
+          "name": "Find by ID",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/v1/{{namespace}}/{{collection}}",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"findOne\": {\n    \"filter\": {\n      \"_id\": \"prod-001\"\n    }\n  }\n}"
+            },
+            "description": "Find a single document by its unique _id."
+          }
+        },
+        {
+          "name": "Find with Projection",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/v1/{{namespace}}/{{collection}}",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"find\": {\n    \"filter\": {\n      \"category\": \"laptop\"\n    },\n    \"projection\": {\n      \"name\": 1,\n      \"price\": 1,\n      \"brand\": 1\n    }\n  }\n}"
+            },
+            "description": "Return only specific fields (name, price, brand) for laptops."
+          }
+        },
+        {
+          "name": "Find with Sort and Limit",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/v1/{{namespace}}/{{collection}}",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"find\": {\n    \"filter\": {\n      \"in_stock\": true\n    },\n    \"sort\": {\n      \"price\": 1\n    },\n    \"options\": {\n      \"limit\": 3\n    }\n  }\n}"
+            },
+            "description": "Find in-stock products sorted by price (ascending), limit to 3 results."
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Update Documents",
+      "item": [
+        {
+          "name": "Update Price ($set)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/v1/{{namespace}}/{{collection}}",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"findOneAndUpdate\": {\n    \"filter\": {\n      \"_id\": \"prod-001\"\n    },\n    \"update\": {\n      \"$set\": {\n        \"price\": 1149.99,\n        \"tags\": [\"business\", \"ultrabook\", \"14-inch\", \"sale\"]\n      }\n    }\n  }\n}"
+            },
+            "description": "Update price and add 'sale' tag to ThinkPad X1."
+          }
+        },
+        {
+          "name": "Update Stock Status ($set)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/v1/{{namespace}}/{{collection}}",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"findOneAndUpdate\": {\n    \"filter\": {\n      \"_id\": \"prod-003\"\n    },\n    \"update\": {\n      \"$set\": {\n        \"in_stock\": true\n      }\n    }\n  }\n}"
+            },
+            "description": "Mark Galaxy S24 Ultra as back in stock."
+          }
+        },
+        {
+          "name": "Update Many - Price Increase",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/v1/{{namespace}}/{{collection}}",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"updateMany\": {\n    \"filter\": {\n      \"brand\": \"Apple\"\n    },\n    \"update\": {\n      \"$set\": {\n        \"premium_support\": true\n      }\n    }\n  }\n}"
+            },
+            "description": "Add premium_support field to all Apple products (schemaless flexibility)."
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Delete Documents",
+      "item": [
+        {
+          "name": "Delete One by ID",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/v1/{{namespace}}/{{collection}}",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"deleteOne\": {\n    \"filter\": {\n      \"_id\": \"prod-005\"\n    }\n  }\n}"
+            },
+            "description": "Delete the Dell monitor by its _id."
+          }
+        },
+        {
+          "name": "Verify Deletion",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/v1/{{namespace}}/{{collection}}",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"find\": {}\n}"
+            },
+            "description": "List all remaining products (should be 5 after deletion)."
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Cleanup",
+      "item": [
+        {
+          "name": "Delete Collection",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/v1/{{namespace}}",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"deleteCollection\": {\n    \"name\": \"{{collection}}\"\n  }\n}"
+            },
+            "description": "Delete the products collection."
+          }
+        }
+      ]
+    }
+  ]
+}
