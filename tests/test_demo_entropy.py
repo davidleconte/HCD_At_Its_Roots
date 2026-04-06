@@ -16,8 +16,8 @@ def test_dry_run_execution():
     result = run_demo("--dry-run", "--no-pause")
     assert result.returncode == 0, f"Script failed with stderr: {result.stderr}"
     assert "[DRY-RUN]" in result.stdout
-    # Verify all 62 module headers appear
-    for i in range(62):
+    # Verify all 72 module headers appear
+    for i in range(72):
         assert f"Module {i}:" in result.stdout, f"Module {i} header missing from full run"
 
 
@@ -32,19 +32,19 @@ def test_invalid_module():
     """Verify the script handles invalid module numbers gracefully."""
     result = run_demo("--dry-run", "99")
     assert "Invalid module number" in result.stdout
-    assert "Valid: 0-61" in result.stdout
+    assert "Valid: 0-71" in result.stdout
 
 
 def test_boundary_module_valid():
-    """Verify module 61 is accepted."""
-    result = run_demo("--dry-run", "--no-pause", "61")
+    """Verify module 71 is accepted."""
+    result = run_demo("--dry-run", "--no-pause", "71")
     assert result.returncode == 0
-    assert "Module 61:" in result.stdout
+    assert "Module 71:" in result.stdout
 
 
 def test_boundary_module_invalid():
-    """Verify module 62 is rejected."""
-    result = run_demo("--dry-run", "62")
+    """Verify module 72 is rejected."""
+    result = run_demo("--dry-run", "72")
     assert "Invalid module number" in result.stdout
 
 
@@ -281,7 +281,92 @@ def test_module_53_decision_framework():
         "Module 53 should reference the decision framework"
 
 
-@pytest.mark.parametrize("module_id", [str(i) for i in range(62)])
+def test_module_62_rbac_content():
+    """Verify module 62 has RBAC content."""
+    result = run_demo("--dry-run", "--no-pause", "62")
+    assert result.returncode == 0
+    assert "role" in result.stdout.lower() or "rbac" in result.stdout.lower() \
+        or "authenticator" in result.stdout.lower(), \
+        "Module 62 should reference RBAC"
+
+
+def test_module_63_tde_content():
+    """Verify module 63 has encryption at rest content."""
+    result = run_demo("--dry-run", "--no-pause", "63")
+    assert result.returncode == 0
+    assert "encrypt" in result.stdout.lower() or "tde" in result.stdout.lower(), \
+        "Module 63 should reference encryption"
+
+
+def test_module_64_commitlog_content():
+    """Verify module 64 has commitlog crash recovery content."""
+    result = run_demo("--dry-run", "--no-pause", "64")
+    assert result.returncode == 0
+    assert "commitlog" in result.stdout.lower() or "crash" in result.stdout.lower(), \
+        "Module 64 should reference commitlog recovery"
+
+
+def test_module_65_hint_expiration_content():
+    """Verify module 65 has hint expiration content."""
+    result = run_demo("--dry-run", "--no-pause", "65")
+    assert result.returncode == 0
+    assert "hint" in result.stdout.lower() or "max_hint_window" in result.stdout.lower(), \
+        "Module 65 should reference hint expiration"
+
+
+def test_module_66_rf_change_content():
+    """Verify module 66 has dynamic RF change content."""
+    result = run_demo("--dry-run", "--no-pause", "66")
+    assert result.returncode == 0
+    assert "replication" in result.stdout.lower() or "alter keyspace" in result.stdout.lower(), \
+        "Module 66 should reference replication factor change"
+
+
+def test_module_67_streaming_content():
+    """Verify module 67 has streaming/bootstrap content."""
+    result = run_demo("--dry-run", "--no-pause", "67")
+    assert result.returncode == 0
+    assert "stream" in result.stdout.lower() or "bootstrap" in result.stdout.lower() \
+        or "netstats" in result.stdout.lower(), \
+        "Module 67 should reference streaming"
+
+
+def test_module_68_mv_content():
+    """Verify module 68 has materialized view content."""
+    result = run_demo("--dry-run", "--no-pause", "68")
+    assert result.returncode == 0
+    assert "materialized" in result.stdout.lower() or "view" in result.stdout.lower(), \
+        "Module 68 should reference materialized views"
+
+
+def test_module_69_nodetool_content():
+    """Verify module 69 has nodetool ops content."""
+    result = run_demo("--dry-run", "--no-pause", "69")
+    assert result.returncode == 0
+    assert "tablestats" in result.stdout.lower() or "tpstats" in result.stdout.lower() \
+        or "proxyhistograms" in result.stdout.lower(), \
+        "Module 69 should reference nodetool operations"
+
+
+def test_module_70_cross_dc_content():
+    """Verify module 70 has cross-DC consistency content."""
+    result = run_demo("--dry-run", "--no-pause", "70")
+    assert result.returncode == 0
+    assert "disconnect" in result.stdout.lower() or "cross-dc" in result.stdout.lower() \
+        or "diverge" in result.stdout.lower() or "partition" in result.stdout.lower(), \
+        "Module 70 should reference cross-DC consistency"
+
+
+def test_module_71_bloom_filter_content():
+    """Verify module 71 has bloom filter/cache tuning content."""
+    result = run_demo("--dry-run", "--no-pause", "71")
+    assert result.returncode == 0
+    assert "bloom" in result.stdout.lower() or "cache" in result.stdout.lower() \
+        or "fp_chance" in result.stdout.lower(), \
+        "Module 71 should reference bloom filter or cache tuning"
+
+
+@pytest.mark.parametrize("module_id", [str(i) for i in range(72)])
 def test_individual_modules_dry(module_id):
     """Verify each individual module runs in dry-run mode."""
     result = run_demo("--dry-run", "--no-pause", module_id)

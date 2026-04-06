@@ -44,7 +44,7 @@ demo-dry: ## Run the demo in dry-run mode (no cluster needed)
 demo-full: ## Build cluster + run full automated demo
 	./scripts/execute-full-demo.sh
 
-demo-score: ## Validate all 62 modules (dry-run scorecard)
+demo-score: ## Validate all 72 modules (dry-run scorecard)
 	./scripts/demo-entropy.sh --score
 
 api: ## Start Data API (http://localhost:8181)

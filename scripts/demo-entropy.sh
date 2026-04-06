@@ -41,6 +41,10 @@ cleanup() {
     done
     ${COMPOSE} start hcd-node1 hcd-node2 hcd-node3 hcd-node4 hcd-node5 hcd-node6 >/dev/null 2>&1 || true
     docker network connect "${HCD_NETWORK}" hcd-node2 >/dev/null 2>&1 || true
+    # Reconnect dc2 nodes (Module 70 may disconnect them)
+    for node in hcd-node4 hcd-node5 hcd-node6; do
+        docker network connect "${HCD_NETWORK}" "$node" >/dev/null 2>&1 || true
+    done
     # Remove any tc latency injection from WAN simulation (Module 29)
     for node in hcd-node4 hcd-node5 hcd-node6; do
         docker exec "$node" tc qdisc del dev eth0 root 2>/dev/null || true
@@ -67,8 +71,8 @@ pause() {
     fi
 }
 
-TOTAL_MODULES=62
-PART_NAMES=("Foundations" "Foundations" "Foundations" "Foundations" "Foundations" "Foundations" "Foundations" "Foundations" "Foundations" "Foundations" "Foundations" "Foundations" "Foundations" "Foundations" "Advanced Failures" "Advanced Failures" "Advanced Failures" "Advanced Failures" "Advanced Failures" "Advanced Failures" "Advanced Failures" "Advanced Failures" "Advanced Failures" "Advanced Failures" "Advanced Failures" "Operations" "Operations" "Operations" "Operations" "Operations" "Operations" "Operations" "Operations" "Operations" "Operations" "Operations" "Operations" "Operations" "Performance" "Performance" "Performance" "Performance" "Performance" "Driver Policies" "Driver Policies" "Driver Policies" "Driver Policies" "Driver Policies" "Transactions" "Transactions" "Transactions" "Transactions" "Transactions" "Transactions" "Enterprise" "Enterprise" "Enterprise" "Enterprise" "Enterprise" "Enterprise" "Enterprise" "Enterprise")
+TOTAL_MODULES=72
+PART_NAMES=("Foundations" "Foundations" "Foundations" "Foundations" "Foundations" "Foundations" "Foundations" "Foundations" "Foundations" "Foundations" "Foundations" "Foundations" "Foundations" "Foundations" "Advanced Failures" "Advanced Failures" "Advanced Failures" "Advanced Failures" "Advanced Failures" "Advanced Failures" "Advanced Failures" "Advanced Failures" "Advanced Failures" "Advanced Failures" "Advanced Failures" "Operations" "Operations" "Operations" "Operations" "Operations" "Operations" "Operations" "Operations" "Operations" "Operations" "Operations" "Operations" "Operations" "Performance" "Performance" "Performance" "Performance" "Performance" "Driver Policies" "Driver Policies" "Driver Policies" "Driver Policies" "Driver Policies" "Transactions" "Transactions" "Transactions" "Transactions" "Transactions" "Transactions" "Enterprise" "Enterprise" "Enterprise" "Enterprise" "Enterprise" "Enterprise" "Enterprise" "Enterprise" "Ops Deep-Dives" "Ops Deep-Dives" "Ops Deep-Dives" "Ops Deep-Dives" "Ops Deep-Dives" "Ops Deep-Dives" "Ops Deep-Dives" "Ops Deep-Dives" "Ops Deep-Dives" "Ops Deep-Dives")
 
 header() {
     local mod=$1
@@ -170,8 +174,8 @@ done
 
 # ─── Validation ───────────────────────────────────────────────────
 if [[ -n "$SELECTED_MODULE" ]]; then
-    if ! [[ "$SELECTED_MODULE" =~ ^([0-9]|[1-5][0-9]|6[01])$ ]]; then
-        echo "Invalid module number: ${SELECTED_MODULE} (Valid: 0-61)"
+    if ! [[ "$SELECTED_MODULE" =~ ^([0-9]|[1-6][0-9]|7[01])$ ]]; then
+        echo "Invalid module number: ${SELECTED_MODULE} (Valid: 0-71)"
         exit 1
     fi
 fi
@@ -357,7 +361,7 @@ run_module() {
             echo -e "${C_BLUE}Every command, every pattern, every failure mode scales linearly.${C_RESET}"
 
             separator
-            echo -e "${C_WHITE}--- Demo Roadmap (62 modules in 7 parts) ---${C_RESET}"
+            echo -e "${C_WHITE}--- Demo Roadmap (72 modules in 8 parts) ---${C_RESET}"
             echo ""
             echo "  PART 1: Foundations       (Modules 1-6)   RF, CL, failures, entropy repair"
             echo "  PART 2: Internals         (Modules 7-13)  Token ring, write/read path, LWT"
@@ -366,6 +370,7 @@ run_module() {
             echo "  PART 5: Production Ops    (Modules 37-47) Rolling restart, stress, security, driver"
             echo "  PART 6: Transactions      (Modules 48-53) ACID model, batches, LWT, sagas"
             echo "  PART 7: Enterprise        (Modules 54-61) Data API, multi-tenancy, DR, decommission"
+            echo "  PART 8: Ops Deep-Dives    (Modules 62-71) RBAC, TDE, crash recovery, MVs, tuning"
             echo ""
             echo "  You can run any single module: ./demo-entropy.sh 23"
             echo "  Modules > 1 auto-create the rf_prod keyspace if needed."
@@ -4518,7 +4523,7 @@ run_module() {
             echo -e "${C_CYAN}║                         SUMMARY DASHBOARD                           ║${C_RESET}"
             echo -e "${C_CYAN}╠══════════════════════════════════════════════════════════════════════╣${C_RESET}"
             echo -e "${C_CYAN}║                                                                    ║${C_RESET}"
-            echo -e "${C_CYAN}║  Modules Completed:  62 (0-61)                                     ║${C_RESET}"
+            echo -e "${C_CYAN}║  Modules Completed:  72 (0-71)                                     ║${C_RESET}"
             echo -e "${C_CYAN}║  Cluster:            6 nodes, 2 DCs, RF=3 per DC                   ║${C_RESET}"
             echo -e "${C_CYAN}║                                                                    ║${C_RESET}"
             echo -e "${C_CYAN}╠══════════════════════════════════════════════════════════════════════╣${C_RESET}"
@@ -6953,6 +6958,1229 @@ run_module() {
                      "The outbox pattern solves the dual-write problem: state + event in one atomic write." \
                      "HCD is the persistence layer — use Temporal.io or a custom state machine for orchestration." \
                      "Every saga step must be idempotent (IF NOT EXISTS) and independently compensatable."
+            ;;
+
+        # ══════════════════════════════════════════════════════════════
+        # PART 8: OPERATIONAL DEEP-DIVES (Modules 62-71)
+        # ══════════════════════════════════════════════════════════════
+        62)
+            header 62 "Live RBAC Demo (Role-Based Access Control)"
+            echo -e "${C_BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${C_RESET}"
+            echo -e "${C_BLUE}  PART 8: OPERATIONAL DEEP-DIVES (Modules 62-71)${C_RESET}"
+            echo -e "${C_BLUE}  Production operations, security, durability, and tuning.${C_RESET}"
+            echo -e "${C_BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${C_RESET}"
+            echo ""
+            echo "HCD ships with AllowAllAuthenticator by default — every connection"
+            echo "is trusted. Production requires PasswordAuthenticator + CassandraAuthorizer"
+            echo "for Role-Based Access Control (RBAC)."
+            echo ""
+
+            # ─── Default vs Production Auth ─────────────────────────
+            echo -e "${C_WHITE}--- Default vs Production Authentication ---${C_RESET}"
+            echo ""
+            echo "  ┌──────────────────────────────────────────────────────────────────┐"
+            echo "  │  cassandra.yaml — Authentication Settings                        │"
+            echo "  ├──────────────────────────────────────────────────────────────────┤"
+            echo "  │  DEFAULT (dev):                                                  │"
+            echo "  │    authenticator: AllowAllAuthenticator                          │"
+            echo "  │    authorizer: AllowAllAuthorizer                                │"
+            echo "  │    → No credentials needed. Anyone can do anything.              │"
+            echo "  │                                                                   │"
+            echo "  │  PRODUCTION:                                                     │"
+            echo "  │    authenticator: PasswordAuthenticator                          │"
+            echo "  │    authorizer: CassandraAuthorizer                               │"
+            echo "  │    → Credentials required. Permissions enforced.                 │"
+            echo "  │                                                                   │"
+            echo "  │  HCD ENTERPRISE:                                                 │"
+            echo "  │    authenticator: com.ibm.hcd.auth.AdvancedAuthenticator         │"
+            echo "  │    → Adds LDAP/OIDC federation on top of RBAC.                  │"
+            echo "  └──────────────────────────────────────────────────────────────────┘"
+            echo ""
+            echo "  Note: Changing authenticator requires a rolling restart of ALL nodes."
+            echo "  This demo shows the CQL commands without changing authenticator,"
+            echo "  since roles/permissions work with AllowAllAuthorizer too."
+            echo ""
+
+            separator
+            echo -e "${C_WHITE}--- Step 1: Create Roles with Different Privilege Levels ---${C_RESET}"
+            echo ""
+            log_cmd "docker exec hcd-node1 cqlsh -e \"CREATE ROLE IF NOT EXISTS role_read WITH PASSWORD = 'read123' AND LOGIN = true;\""
+            log_cmd "docker exec hcd-node1 cqlsh -e \"CREATE ROLE IF NOT EXISTS role_write WITH PASSWORD = 'write123' AND LOGIN = true;\""
+            log_cmd "docker exec hcd-node1 cqlsh -e \"CREATE ROLE IF NOT EXISTS role_admin WITH PASSWORD = 'admin123' AND LOGIN = true AND SUPERUSER = false;\""
+
+            separator
+            echo -e "${C_WHITE}--- Step 2: Grant Granular Permissions ---${C_RESET}"
+            echo ""
+            log_cmd "docker exec hcd-node1 cqlsh -e \"GRANT SELECT ON KEYSPACE rf_prod TO role_read;\""
+            log_cmd "docker exec hcd-node1 cqlsh -e \"GRANT MODIFY ON KEYSPACE rf_prod TO role_write;\""
+            log_cmd "docker exec hcd-node1 cqlsh -e \"GRANT ALL ON KEYSPACE rf_prod TO role_admin;\""
+            echo ""
+            echo "  Permission matrix:"
+            echo ""
+            echo "  ┌──────────────┬─────────┬─────────┬─────────┬────────┬────────┐"
+            echo "  │ Role         │ SELECT  │ INSERT  │ UPDATE  │ DELETE │ ALTER  │"
+            echo "  ├──────────────┼─────────┼─────────┼─────────┼────────┼────────┤"
+            echo "  │ role_read    │   ✓     │         │         │        │        │"
+            echo "  │ role_write   │         │   ✓     │   ✓     │   ✓    │        │"
+            echo "  │ role_admin   │   ✓     │   ✓     │   ✓     │   ✓    │   ✓    │"
+            echo "  └──────────────┴─────────┴─────────┴─────────┴────────┴────────┘"
+            echo ""
+
+            separator
+            echo -e "${C_WHITE}--- Step 3: Verify Permissions ---${C_RESET}"
+            log_cmd "docker exec hcd-node1 cqlsh -e \"LIST ALL PERMISSIONS OF role_read;\""
+            log_cmd "docker exec hcd-node1 cqlsh -e \"LIST ALL PERMISSIONS OF role_write;\""
+            log_cmd "docker exec hcd-node1 cqlsh -e \"LIST ALL PERMISSIONS OF role_admin;\""
+
+            separator
+            echo -e "${C_WHITE}--- Step 4: Permission Denial Demo ---${C_RESET}"
+            echo ""
+            echo "  With PasswordAuthenticator enabled, these would be enforced:"
+            echo ""
+            echo "  # role_read tries to INSERT → DENIED"
+            echo "  cqlsh -u role_read -p read123 -e \\"
+            echo "    \"INSERT INTO rf_prod.entropy_test (id, value) VALUES (999, 'denied');\""
+            echo "  → Unauthorized: role_read has no MODIFY permission on rf_prod.entropy_test"
+            echo ""
+            echo "  # role_write tries to SELECT → DENIED"
+            echo "  cqlsh -u role_write -p write123 -e \\"
+            echo "    \"SELECT * FROM rf_prod.entropy_test;\""
+            echo "  → Unauthorized: role_write has no SELECT permission on rf_prod.entropy_test"
+            echo ""
+            echo "  # role_read tries to DROP TABLE → DENIED"
+            echo "  cqlsh -u role_read -p read123 -e \\"
+            echo "    \"DROP TABLE rf_prod.entropy_test;\""
+            echo "  → Unauthorized: role_read has no DROP permission"
+            echo ""
+
+            lookfor "Each role can only perform its granted operations."
+            lookfor "Permission errors are immediate — no partial execution."
+
+            separator
+            echo -e "${C_WHITE}--- Step 5: Role Hierarchy & Inheritance ---${C_RESET}"
+            echo ""
+            echo "  Roles can inherit permissions from other roles:"
+            echo ""
+            log_cmd "docker exec hcd-node1 cqlsh -e \"CREATE ROLE IF NOT EXISTS role_app WITH PASSWORD = 'app123' AND LOGIN = true;\""
+            log_cmd "docker exec hcd-node1 cqlsh -e \"GRANT role_read TO role_app;\""
+            log_cmd "docker exec hcd-node1 cqlsh -e \"GRANT role_write TO role_app;\""
+            echo ""
+            echo "  role_app now inherits SELECT (from role_read) + MODIFY (from role_write)."
+            echo "  This is how you compose fine-grained permissions in production."
+            echo ""
+
+            separator
+            echo -e "${C_WHITE}--- Cleanup ---${C_RESET}"
+            log_cmd "docker exec hcd-node1 cqlsh -e \"DROP ROLE IF EXISTS role_app;\""
+            log_cmd "docker exec hcd-node1 cqlsh -e \"DROP ROLE IF EXISTS role_read;\""
+            log_cmd "docker exec hcd-node1 cqlsh -e \"DROP ROLE IF EXISTS role_write;\""
+            log_cmd "docker exec hcd-node1 cqlsh -e \"DROP ROLE IF EXISTS role_admin;\""
+
+            echo ""
+            echo -e "${C_YELLOW}QUESTION: Why shouldn't you grant ALL PERMISSIONS to application roles?${C_RESET}"
+            pause
+            echo -e "${C_GREEN}ANSWER: Principle of least privilege — if app credentials are compromised,${C_RESET}"
+            echo -e "${C_GREEN}damage is limited to the granted permissions. A role_read credential leak${C_RESET}"
+            echo -e "${C_GREEN}cannot delete data. Split read/write/admin roles and rotate credentials.${C_RESET}"
+            echo ""
+
+            takeaway "HCD supports full RBAC: CREATE ROLE, GRANT, REVOKE with keyspace/table granularity." \
+                     "Production MUST enable PasswordAuthenticator + CassandraAuthorizer." \
+                     "HCD adds AdvancedAuthenticator for LDAP/OIDC enterprise federation." \
+                     "Role inheritance lets you compose permissions (GRANT role_read TO role_app)." \
+                     "Never use the default cassandra/cassandra superuser in production — create named roles."
+
+            challenge "Create a role that can only SELECT from a single table (not the entire keyspace):" \
+                      "GRANT SELECT ON TABLE rf_prod.entropy_test TO role_table_reader;" \
+                      "Verify with LIST ALL PERMISSIONS OF role_table_reader;"
+            ;;
+        63)
+            header 63 "Encryption at Rest (Transparent Data Encryption)"
+            echo "Transparent Data Encryption (TDE) protects data on disk — SSTables,"
+            echo "commitlogs, and hints are encrypted without any application changes."
+            echo "TDE protects against physical disk theft, not compromised applications."
+            echo ""
+
+            # ─── What TDE Protects ──────────────────────────────────
+            echo -e "${C_WHITE}--- What TDE Protects (and What It Doesn't) ---${C_RESET}"
+            echo ""
+            echo "  ┌──────────────────────────────────────────────────────────────────┐"
+            echo "  │  PROTECTED by TDE:                                               │"
+            echo "  │    ✓ SSTables on disk (data files)                               │"
+            echo "  │    ✓ Commitlog segments (durability journal)                     │"
+            echo "  │    ✓ Hints (pending deliveries to down nodes)                    │"
+            echo "  │    ✓ Backups/snapshots (inherit SSTable encryption)              │"
+            echo "  │                                                                   │"
+            echo "  │  NOT PROTECTED by TDE:                                           │"
+            echo "  │    ✗ Data in flight (use TLS for inter-node + client)            │"
+            echo "  │    ✗ Data in memory (memtables, caches)                          │"
+            echo "  │    ✗ Authenticated app connections (app reads decrypted data)    │"
+            echo "  │    ✗ CQL query results over network (use TLS)                    │"
+            echo "  └──────────────────────────────────────────────────────────────────┘"
+            echo ""
+
+            separator
+            echo -e "${C_WHITE}--- TDE Configuration in cassandra.yaml ---${C_RESET}"
+            echo ""
+            echo "  transparent_data_encryption_options:"
+            echo "    enabled: true"
+            echo "    chunk_length_kb: 64"
+            echo "    cipher: AES/CBC/PKCS5Padding"
+            echo "    key_alias: hcd_tde_key"
+            echo "    key_provider:"
+            echo "      - class_name: org.apache.cassandra.security.JKSKeyProvider"
+            echo "        parameters:"
+            echo "          - keystore: /etc/cassandra/conf/.keystore"
+            echo "            keystore_password: changeit"
+            echo "            store_type: JCEKS"
+            echo "            key_password: changeit"
+            echo ""
+            echo "  This uses Java KeyStore (JKS/JCEKS) as the key provider."
+            echo "  In production, use an external KMS (Vault, AWS KMS, etc.)."
+            echo ""
+
+            separator
+            echo -e "${C_WHITE}--- Encryption Scope Options ---${C_RESET}"
+            echo ""
+            echo "  ┌──────────────────────────┬──────────────────────────────────────┐"
+            echo "  │ Component                │ Configuration                         │"
+            echo "  ├──────────────────────────┼──────────────────────────────────────┤"
+            echo "  │ SSTables                 │ transparent_data_encryption_options   │"
+            echo "  │ Commitlog                │ commitlog_encryption (separate flag)  │"
+            echo "  │ Hints                    │ hints_encryption (separate flag)       │"
+            echo "  │ Inter-node traffic       │ server_encryption_options (TLS)       │"
+            echo "  │ Client traffic           │ client_encryption_options (TLS)       │"
+            echo "  └──────────────────────────┴──────────────────────────────────────┘"
+            echo ""
+
+            separator
+            echo -e "${C_WHITE}--- Demo: Examining SSTable Files on Disk ---${C_RESET}"
+            echo ""
+            echo "  Without TDE, SSTable data is plaintext on disk:"
+            echo ""
+
+            if [ "$DRY_RUN" = false ]; then
+                # Find an SSTable data file
+                SSTABLE_PATH=$(docker exec hcd-node1 find /var/lib/cassandra/data/rf_prod -name "*-Data.db" 2>/dev/null | head -1)
+                if [ -n "$SSTABLE_PATH" ]; then
+                    echo -e "${C_GREEN}[EXEC]${C_RESET} Found SSTable: ${SSTABLE_PATH}"
+                    echo ""
+                    echo "  First 128 bytes of SSTable (hexdump):"
+                    docker exec hcd-node1 hexdump -C "$SSTABLE_PATH" 2>/dev/null | head -8
+                    echo ""
+                    echo "  Strings visible in SSTable (plaintext data):"
+                    docker exec hcd-node1 strings "$SSTABLE_PATH" 2>/dev/null | head -10
+                else
+                    echo -e "${C_BLUE}[INFO]${C_RESET} No SSTable files found (table may be empty or recently flushed)."
+                fi
+            else
+                echo -e "${C_YELLOW}[DRY-RUN]${C_RESET} find /var/lib/cassandra/data/rf_prod -name '*-Data.db' | head -1"
+                echo -e "${C_YELLOW}[DRY-RUN]${C_RESET} hexdump -C <sstable-path> | head -8"
+                echo -e "${C_YELLOW}[DRY-RUN]${C_RESET} strings <sstable-path> | head -10"
+            fi
+
+            echo ""
+            lookfor "Without TDE: hexdump shows readable patterns; strings shows actual data values."
+            lookfor "With TDE enabled: hexdump shows random bytes; strings returns nothing meaningful."
+
+            separator
+            echo -e "${C_WHITE}--- Performance Impact ---${C_RESET}"
+            echo ""
+            echo "  ┌──────────────────────────────────────────────────────────────────┐"
+            echo "  │  Typical TDE overhead:                                           │"
+            echo "  │                                                                   │"
+            echo "  │  Read latency:   +5-15% (decrypt on read from disk)             │"
+            echo "  │  Write latency:  +5-10% (encrypt on flush to SSTable)           │"
+            echo "  │  CPU usage:      +10-20% (AES encryption/decryption)            │"
+            echo "  │  Disk space:     ~same (encrypted blocks same size as plaintext) │"
+            echo "  │                                                                   │"
+            echo "  │  Modern CPUs with AES-NI hardware acceleration minimize impact.  │"
+            echo "  │  The overhead is typically acceptable for compliance workloads.   │"
+            echo "  └──────────────────────────────────────────────────────────────────┘"
+            echo ""
+
+            separator
+            echo -e "${C_WHITE}--- Key Rotation Workflow ---${C_RESET}"
+            echo ""
+            echo "  1. Add new key to keystore with new alias"
+            echo "  2. Update cassandra.yaml: key_alias → new_key_alias"
+            echo "  3. Rolling restart (nodes pick up new key)"
+            echo "  4. Run nodetool upgradesstables (re-encrypts with new key)"
+            echo "  5. Remove old key from keystore after all SSTables re-encrypted"
+            echo ""
+            echo "  Key rotation does NOT require downtime — rolling restart + upgradesstables."
+            echo ""
+
+            echo -e "${C_YELLOW}QUESTION: Does TDE protect against a compromised application${C_RESET}"
+            echo -e "${C_YELLOW}that has valid CQL credentials?${C_RESET}"
+            pause
+            echo -e "${C_GREEN}ANSWER: No. TDE protects data at rest — on disk. A compromised app${C_RESET}"
+            echo -e "${C_GREEN}with valid credentials reads decrypted data through CQL normally.${C_RESET}"
+            echo -e "${C_GREEN}TDE protects against: stolen disks, decommissioned hardware, backup theft,${C_RESET}"
+            echo -e "${C_GREEN}unauthorized filesystem access. For app-level security, use RBAC (Module 62).${C_RESET}"
+            echo ""
+
+            takeaway "TDE encrypts SSTables, commitlogs, and hints on disk — transparent to applications." \
+                     "Uses JKS/JCEKS key provider by default; production should use external KMS." \
+                     "Performance overhead is 5-15% with AES-NI hardware acceleration." \
+                     "Key rotation is online: add new key, rolling restart, upgradesstables." \
+                     "TDE + TLS + RBAC = defense in depth: at-rest + in-flight + access control."
+
+            challenge "Generate a JCEKS keystore with a 256-bit AES key:" \
+                      "keytool -genseckey -keyalg AES -keysize 256 -keystore /tmp/hcd.keystore -storetype JCEKS -alias hcd_key" \
+                      "Then configure transparent_data_encryption_options in cassandra.yaml to reference it."
+            ;;
+        64)
+            header 64 "Commitlog Durability & Crash Recovery"
+            echo "The commitlog is HCD's durability guarantee. Every write is appended"
+            echo "to the commitlog BEFORE the acknowledgment is sent to the client."
+            echo "If a node crashes, the commitlog is replayed on restart — zero data loss."
+            echo ""
+
+            # ─── Write Path & Commitlog ─────────────────────────────
+            echo -e "${C_WHITE}--- The Write Path (Durability Flow) ---${C_RESET}"
+            echo ""
+            echo "  ┌──────────────────────────────────────────────────────────────────┐"
+            echo "  │  Client WRITE                                                    │"
+            echo "  │    │                                                              │"
+            echo "  │    ▼                                                              │"
+            echo "  │  1. Append to COMMITLOG (sequential disk write)                  │"
+            echo "  │    │    → fsync: periodic (default) or batch                     │"
+            echo "  │    │    → This is the durability guarantee                       │"
+            echo "  │    ▼                                                              │"
+            echo "  │  2. Write to MEMTABLE (in-memory sorted structure)               │"
+            echo "  │    │                                                              │"
+            echo "  │    ▼                                                              │"
+            echo "  │  3. ACK to client (write is now durable + queryable)             │"
+            echo "  │    │                                                              │"
+            echo "  │    ▼ (later, asynchronous)                                       │"
+            echo "  │  4. FLUSH memtable → SSTable (persistent sorted file)            │"
+            echo "  │    │                                                              │"
+            echo "  │    ▼                                                              │"
+            echo "  │  5. Commitlog segment RECYCLED (data now in SSTable)             │"
+            echo "  └──────────────────────────────────────────────────────────────────┘"
+            echo ""
+            echo "  commitlog_sync modes:"
+            echo "    periodic (default): fsync every commitlog_sync_period_in_ms (10s)"
+            echo "       → Window of data loss: up to 10 seconds on power failure"
+            echo "       → Lower latency, slightly less safe"
+            echo "    batch: fsync on every write batch"
+            echo "       → Zero data loss window"
+            echo "       → Higher latency (~2x), maximum safety"
+            echo ""
+
+            separator
+            echo -e "${C_WHITE}--- Demo: Crash Recovery via Commitlog Replay ---${C_RESET}"
+            echo ""
+            echo "  We will: write data → hard-kill a node (SIGKILL) → restart → verify zero loss."
+            echo ""
+
+            log_cmd "docker exec hcd-node1 cqlsh -e \"CREATE TABLE IF NOT EXISTS rf_prod.crash_test (id int PRIMARY KEY, data text, ts timestamp);\""
+            log_cmd "docker exec hcd-node1 cqlsh -e \"TRUNCATE rf_prod.crash_test;\""
+
+            echo ""
+            log_info "Writing 20 rows to rf_prod.crash_test..."
+            if [ "$DRY_RUN" = false ]; then
+                for i in $(seq 1 20); do
+                    docker exec hcd-node1 cqlsh -e "INSERT INTO rf_prod.crash_test (id, data, ts) VALUES ($i, 'crash-test-$i', toTimestamp(now()));" 2>/dev/null
+                done
+                echo -e "${C_GREEN}[EXEC]${C_RESET} 20 rows written."
+            else
+                echo -e "${C_YELLOW}[DRY-RUN]${C_RESET} INSERT INTO rf_prod.crash_test ... (20 rows)"
+            fi
+
+            separator
+            echo -e "${C_WHITE}--- Hard-Kill node3 (SIGKILL — simulates power failure) ---${C_RESET}"
+            echo ""
+            echo "  docker kill sends SIGKILL: no graceful shutdown, no flush."
+            echo "  The memtable has unflushed data — only the commitlog saves it."
+            echo ""
+
+            if [ "$DRY_RUN" = false ]; then
+                log_info "Counting rows on node3 BEFORE crash..."
+                docker exec hcd-node3 cqlsh -e "CONSISTENCY ONE; SELECT count(*) FROM rf_prod.crash_test;" 2>&1 | tail -n 5
+                echo ""
+                log_info "Killing hcd-node3 (SIGKILL)..."
+                docker kill hcd-node3 >/dev/null 2>&1
+                sleep 2
+                echo -e "${C_GREEN}[EXEC]${C_RESET} hcd-node3 killed (SIGKILL — no graceful shutdown)."
+                echo ""
+                log_info "Restarting hcd-node3..."
+                docker start hcd-node3 >/dev/null 2>&1
+                wait_for_node_un "172.28.0.4" "Node 3"
+                echo ""
+                log_info "Counting rows on node3 AFTER crash recovery..."
+                docker exec hcd-node3 cqlsh -e "CONSISTENCY ONE; SELECT count(*) FROM rf_prod.crash_test;" 2>&1 | tail -n 5
+            else
+                echo -e "${C_YELLOW}[DRY-RUN]${C_RESET} SELECT count(*) FROM rf_prod.crash_test; (on node3, before crash)"
+                echo -e "${C_YELLOW}[DRY-RUN]${C_RESET} docker kill hcd-node3"
+                echo -e "${C_YELLOW}[DRY-RUN]${C_RESET} docker start hcd-node3"
+                echo -e "${C_YELLOW}[DRY-RUN]${C_RESET} wait_for_node_un (node3 rejoins)"
+                echo -e "${C_YELLOW}[DRY-RUN]${C_RESET} SELECT count(*) FROM rf_prod.crash_test; (on node3, after recovery)"
+            fi
+
+            echo ""
+            lookfor "Row count BEFORE and AFTER crash should be identical: 20 rows."
+            lookfor "The commitlog was replayed on startup — no data was lost."
+
+            separator
+            echo -e "${C_WHITE}--- Commitlog on Disk ---${C_RESET}"
+            log_cmd "docker exec hcd-node1 ls -lh /var/lib/cassandra/commitlog/ 2>/dev/null | head -10 || echo '(commitlog directory)'"
+            echo ""
+            echo "  Commitlog segments are recycled after the corresponding memtable is flushed."
+            echo "  Active segments contain unflushed writes — the durability safety net."
+            echo ""
+
+            echo -e "${C_YELLOW}QUESTION: What is the difference between 'docker stop' and 'docker kill'${C_RESET}"
+            echo -e "${C_YELLOW}for testing durability?${C_RESET}"
+            pause
+            echo -e "${C_GREEN}ANSWER: 'docker stop' sends SIGTERM → graceful shutdown → memtable flush.${C_RESET}"
+            echo -e "${C_GREEN}No commitlog replay needed. 'docker kill' sends SIGKILL → instant death →${C_RESET}"
+            echo -e "${C_GREEN}memtable lost → commitlog replay on restart is the ONLY way data survives.${C_RESET}"
+            echo -e "${C_GREEN}Always test with 'kill' to prove true durability.${C_RESET}"
+            echo ""
+
+            takeaway "Every write hits the commitlog BEFORE the client receives an ACK." \
+                     "SIGKILL (power failure) → commitlog replay on restart → zero data loss." \
+                     "commitlog_sync=periodic has a small loss window; batch mode has zero loss window." \
+                     "Commitlog segments are recycled after memtable flush — they don't grow forever." \
+                     "This is why HCD can survive node crashes without losing acknowledged writes."
+
+            challenge "Change commitlog_sync from 'periodic' to 'batch' in cassandra.yaml.template:" \
+                      "Measure write latency before and after (expect ~2x increase)." \
+                      "Decide which mode is appropriate for your SLA (latency vs. safety)."
+            ;;
+        65)
+            header 65 "Hint Expiration & Data Gaps"
+            echo "Hinted handoff is an optimization for short outages: when a replica is"
+            echo "down, the coordinator stores hints (pending writes) and delivers them"
+            echo "when the node returns. But hints have a time limit."
+            echo ""
+
+            # ─── Hint Lifecycle ─────────────────────────────────────
+            echo -e "${C_WHITE}--- Hint Lifecycle ---${C_RESET}"
+            echo ""
+            echo "  ┌──────────────────────────────────────────────────────────────────┐"
+            echo "  │  1. Node3 goes DOWN                                              │"
+            echo "  │  2. Client writes at CL=QUORUM → succeeds (nodes 1+2 ack)      │"
+            echo "  │  3. Coordinator stores HINT for node3                            │"
+            echo "  │     (hint = 'deliver this mutation to node3 when it returns')    │"
+            echo "  │  4a. Node3 returns WITHIN max_hint_window (3h default)           │"
+            echo "  │      → Hints delivered automatically. Node3 catches up.          │"
+            echo "  │  4b. Node3 returns AFTER max_hint_window expired                 │"
+            echo "  │      → Hints DISCARDED. Node3 has a DATA GAP.                   │"
+            echo "  │      → Only 'nodetool repair' can fix it.                        │"
+            echo "  └──────────────────────────────────────────────────────────────────┘"
+            echo ""
+            echo "  max_hint_window_in_ms = 10800000 (3 hours, default)"
+            echo ""
+
+            separator
+            echo -e "${C_WHITE}--- Demo: Hints in Action ---${C_RESET}"
+            echo ""
+
+            log_cmd "docker exec hcd-node1 cqlsh -e \"CREATE TABLE IF NOT EXISTS rf_prod.hint_demo (id int PRIMARY KEY, data text);\""
+            log_cmd "docker exec hcd-node1 cqlsh -e \"TRUNCATE rf_prod.hint_demo;\""
+
+            echo ""
+            echo "  Step 1: Stop node3 (hints will be stored for it)"
+            if [ "$DRY_RUN" = false ]; then
+                docker stop hcd-node3 >/dev/null 2>&1
+                sleep 3
+                echo -e "${C_GREEN}[EXEC]${C_RESET} hcd-node3 stopped."
+            else
+                echo -e "${C_YELLOW}[DRY-RUN]${C_RESET} docker stop hcd-node3"
+            fi
+
+            echo ""
+            echo "  Step 2: Write 10 rows (hints stored for node3)"
+            if [ "$DRY_RUN" = false ]; then
+                for i in $(seq 1 10); do
+                    docker exec hcd-node1 cqlsh -e "INSERT INTO rf_prod.hint_demo (id, data) VALUES ($i, 'hint-data-$i');" 2>/dev/null
+                done
+                echo -e "${C_GREEN}[EXEC]${C_RESET} 10 rows written while node3 is down."
+            else
+                echo -e "${C_YELLOW}[DRY-RUN]${C_RESET} INSERT INTO rf_prod.hint_demo ... (10 rows while node3 is down)"
+            fi
+
+            echo ""
+            echo "  Step 3: Check pending hints"
+            log_cmd "docker exec hcd-node1 nodetool tpstats 2>/dev/null | grep -i hint || echo '(HintedHandoff stats)'"
+
+            echo ""
+            echo "  Step 4: Restart node3 (hints will be delivered)"
+            if [ "$DRY_RUN" = false ]; then
+                docker start hcd-node3 >/dev/null 2>&1
+                wait_for_node_un "172.28.0.4" "Node 3"
+                sleep 5
+                echo -e "${C_GREEN}[EXEC]${C_RESET} hcd-node3 restarted. Hints being delivered..."
+            else
+                echo -e "${C_YELLOW}[DRY-RUN]${C_RESET} docker start hcd-node3"
+                echo -e "${C_YELLOW}[DRY-RUN]${C_RESET} wait_for_node_un (node3 rejoins)"
+            fi
+
+            echo ""
+            echo "  Step 5: Verify data arrived on node3"
+            log_cmd "docker exec hcd-node3 cqlsh -e \"CONSISTENCY ONE; SELECT count(*) FROM rf_prod.hint_demo;\" 2>&1 | tail -n 5 || echo '(node3 count)'"
+            lookfor "Node3 should show 10 rows — hints were delivered successfully."
+
+            separator
+            echo -e "${C_WHITE}--- The Danger: What If Hints Expire? ---${C_RESET}"
+            echo ""
+            echo "  ┌──────────────────────────────────────────────────────────────────┐"
+            echo "  │  SCENARIO: Node down for 4 hours (hint window = 3 hours)        │"
+            echo "  │                                                                   │"
+            echo "  │  Hour 0:  Node3 goes down                                        │"
+            echo "  │  Hour 1:  Writes continue → hints stored (1h of hints)          │"
+            echo "  │  Hour 2:  More writes → hints stored (2h of hints)              │"
+            echo "  │  Hour 3:  max_hint_window reached                                │"
+            echo "  │  Hour 3+: NEW hints are DROPPED. Coordinator stops storing them. │"
+            echo "  │  Hour 4:  Node3 returns                                          │"
+            echo "  │           → Hints from hours 0-3 are delivered ✓                │"
+            echo "  │           → Writes from hours 3-4 are MISSING ✗                 │"
+            echo "  │           → Only repair can fix the gap                          │"
+            echo "  │                                                                   │"
+            echo "  │  CRITICAL: Hints are NOT a durability guarantee!                 │"
+            echo "  │  They are an optimization for short outages only.                │"
+            echo "  └──────────────────────────────────────────────────────────────────┘"
+            echo ""
+
+            separator
+            echo -e "${C_WHITE}--- Recovery: Repair Fixes Data Gaps ---${C_RESET}"
+            echo ""
+            echo "  When hints expire, 'nodetool repair' compares replicas and streams"
+            echo "  the missing data to the stale node:"
+            echo ""
+            echo "  nodetool repair -pr rf_prod   # primary-range repair on the stale node"
+            echo ""
+            echo "  This is why scheduled repair (Module 61) is MANDATORY in production."
+            echo "  Hints handle minutes of downtime; repair handles hours and days."
+            echo ""
+
+            echo -e "${C_YELLOW}QUESTION: If hints expire, is the data lost forever?${C_RESET}"
+            pause
+            echo -e "${C_GREEN}ANSWER: No! The data exists on the other replicas (nodes 1 and 2).${C_RESET}"
+            echo -e "${C_GREEN}Repair compares replicas and streams the missing data to node3.${C_RESET}"
+            echo -e "${C_GREEN}Hints are an optimization for fast convergence, not a durability guarantee.${C_RESET}"
+            echo -e "${C_GREEN}The durability guarantee is: RF copies exist on RF nodes. Repair ensures${C_RESET}"
+            echo -e "${C_GREEN}all replicas converge eventually.${C_RESET}"
+            echo ""
+
+            takeaway "Hints cover short outages (< max_hint_window, default 3 hours)." \
+                     "After hint window expires, new writes are NOT stored — creating a data gap." \
+                     "Repair is the ONLY way to fix data gaps from expired hints." \
+                     "This is why scheduled repair is mandatory, not optional." \
+                     "Monitor hints: nodetool tpstats (HintedHandoff) and system.hints table size."
+
+            challenge "Check your hint configuration: grep max_hint_window cassandra.yaml" \
+                      "Calculate: if your repair runs every 7 days, and max_hint_window is 3 hours," \
+                      "any outage > 3 hours creates a gap that only the next repair fixes."
+            ;;
+        66)
+            header 66 "Dynamic Replication Factor Change"
+            echo "ALTER KEYSPACE changes the replication metadata — but it does NOT"
+            echo "automatically copy data to new replicas. This creates a dangerous"
+            echo "window where reads at higher consistency levels can fail."
+            echo ""
+
+            # ─── The Danger Window ──────────────────────────────────
+            echo -e "${C_WHITE}--- The Danger Window ---${C_RESET}"
+            echo ""
+            echo "  ┌──────────────────────────────────────────────────────────────────┐"
+            echo "  │  Step 1: CREATE KEYSPACE with RF=1 (1 replica per token range)  │"
+            echo "  │  Step 2: INSERT data → stored on 1 node only                    │"
+            echo "  │  Step 3: ALTER KEYSPACE to RF=3                                  │"
+            echo "  │          → Metadata updated: 3 replicas per range               │"
+            echo "  │          → BUT: new replicas have NO DATA yet!                  │"
+            echo "  │  Step 4: SELECT at CL=QUORUM (needs 2 of 3 replicas)            │"
+            echo "  │          → Only 1 replica has data → inconsistent reads!        │"
+            echo "  │  Step 5: nodetool repair → copies data to new replicas          │"
+            echo "  │  Step 6: SELECT at CL=QUORUM → works correctly now              │"
+            echo "  └──────────────────────────────────────────────────────────────────┘"
+            echo ""
+
+            separator
+            echo -e "${C_WHITE}--- Demo: RF=1 → RF=3 with Repair ---${C_RESET}"
+            echo ""
+            echo "  Step 1: Create keyspace with RF=1"
+            log_cmd "docker exec hcd-node1 cqlsh -e \"CREATE KEYSPACE IF NOT EXISTS rf_change_demo WITH replication = {'class': 'NetworkTopologyStrategy', 'dc1': 1};\""
+            log_cmd "docker exec hcd-node1 cqlsh -e \"CREATE TABLE IF NOT EXISTS rf_change_demo.items (id int PRIMARY KEY, name text);\""
+
+            echo ""
+            echo "  Step 2: Insert 10 rows at CL=ONE (RF=1, only 1 copy exists)"
+            if [ "$DRY_RUN" = false ]; then
+                for i in $(seq 1 10); do
+                    docker exec hcd-node1 cqlsh -e "INSERT INTO rf_change_demo.items (id, name) VALUES ($i, 'item-$i');" 2>/dev/null
+                done
+                echo -e "${C_GREEN}[EXEC]${C_RESET} 10 rows inserted (RF=1, single copy)."
+            else
+                echo -e "${C_YELLOW}[DRY-RUN]${C_RESET} INSERT INTO rf_change_demo.items ... (10 rows, RF=1)"
+            fi
+
+            echo ""
+            echo "  Step 3: Show current replica distribution (RF=1)"
+            log_cmd "docker exec hcd-node1 nodetool describering rf_change_demo 2>/dev/null | head -5 || echo '(describering: 1 endpoint per range)'"
+
+            separator
+            echo -e "${C_WHITE}--- ALTER KEYSPACE to RF=3 ---${C_RESET}"
+            log_cmd "docker exec hcd-node1 cqlsh -e \"ALTER KEYSPACE rf_change_demo WITH replication = {'class': 'NetworkTopologyStrategy', 'dc1': 3};\""
+            echo ""
+            echo "  Metadata now says RF=3, but only 1 of 3 replicas has data!"
+            echo ""
+            log_cmd "docker exec hcd-node1 nodetool describering rf_change_demo 2>/dev/null | head -5 || echo '(describering: 3 endpoints per range, but 2 are empty)'"
+
+            separator
+            echo -e "${C_WHITE}--- The Problem: Reads Before Repair ---${C_RESET}"
+            echo ""
+            echo "  At CL=QUORUM (needs 2 of 3): only 1 replica has data."
+            echo "  Reads may return stale/empty results from the 2 empty replicas."
+            echo ""
+            log_cmd "docker exec hcd-node1 cqlsh -e \"CONSISTENCY QUORUM; SELECT count(*) FROM rf_change_demo.items;\" 2>&1 | tail -n 5 || echo '(QUORUM read — may show inconsistent count)'"
+
+            separator
+            echo -e "${C_WHITE}--- Fix: Repair Populates New Replicas ---${C_RESET}"
+            log_cmd "docker exec hcd-node1 nodetool repair rf_change_demo 2>&1 | tail -n 5 || echo '(repair completed)'"
+            echo ""
+            echo "  After repair, all 3 replicas have the data:"
+            log_cmd "docker exec hcd-node1 cqlsh -e \"CONSISTENCY QUORUM; SELECT count(*) FROM rf_change_demo.items;\" 2>&1 | tail -n 5 || echo '(QUORUM read after repair)'"
+            lookfor "Count should be 10 — all replicas now consistent."
+
+            separator
+            echo -e "${C_WHITE}--- Cleanup ---${C_RESET}"
+            log_cmd "docker exec hcd-node1 cqlsh -e \"DROP KEYSPACE IF EXISTS rf_change_demo;\""
+
+            echo ""
+            echo -e "${C_YELLOW}QUESTION: Why doesn't ALTER KEYSPACE automatically copy data to new replicas?${C_RESET}"
+            pause
+            echo -e "${C_GREEN}ANSWER: By design — to avoid surprise load. ALTER is a metadata-only operation.${C_RESET}"
+            echo -e "${C_GREEN}Data movement (streaming) is expensive: it consumes disk I/O, network bandwidth,${C_RESET}"
+            echo -e "${C_GREEN}and can impact production traffic. Repair lets the operator control WHEN and${C_RESET}"
+            echo -e "${C_GREEN}HOW FAST data is copied (via stream throttling). Implicit data movement would${C_RESET}"
+            echo -e "${C_GREEN}be a dangerous surprise in production.${C_RESET}"
+            echo ""
+
+            takeaway "ALTER KEYSPACE changes metadata only — new replicas start EMPTY." \
+                     "Reads at higher CL can fail or return stale data until repair runs." \
+                     "Always run 'nodetool repair' immediately after increasing RF." \
+                     "Decreasing RF also needs cleanup: 'nodetool cleanup' removes orphaned data." \
+                     "Plan RF changes during maintenance windows — repair generates I/O load."
+
+            challenge "Try ALTER KEYSPACE rf_change_demo WITH replication = {'class': 'NetworkTopologyStrategy', 'dc1': 5};" \
+                      "With only 3 nodes in dc1, RF=5 is impossible. Observe the warning or error." \
+                      "What is the maximum useful RF for a datacenter with N nodes?"
+            ;;
+        67)
+            header 67 "Streaming & Bootstrap Monitoring"
+            echo "When a new node joins the cluster or repair runs, data is transferred"
+            echo "via streaming. Understanding streaming is critical for capacity planning"
+            echo "and maintenance window estimation."
+            echo ""
+
+            # ─── Bootstrap Lifecycle ────────────────────────────────
+            echo -e "${C_WHITE}--- Bootstrap Lifecycle (New Node Joins) ---${C_RESET}"
+            echo ""
+            echo "  ┌──────────────────────────────────────────────────────────────────┐"
+            echo "  │  1. New node starts → contacts seed nodes                       │"
+            echo "  │  2. Gossip: announces itself → receives cluster topology        │"
+            echo "  │  3. Token assignment: gets token ranges (vnodes)                │"
+            echo "  │  4. nodetool status shows: UJ (Up/Joining)                      │"
+            echo "  │  5. STREAMING: receives data from existing nodes                │"
+            echo "  │     └── This is the slowest step (minutes to hours)             │"
+            echo "  │  6. Compaction: merges received SSTables                        │"
+            echo "  │  7. nodetool status shows: UN (Up/Normal) — bootstrap complete  │"
+            echo "  │  8. Run 'nodetool cleanup' on OLD nodes (remove migrated data)  │"
+            echo "  └──────────────────────────────────────────────────────────────────┘"
+            echo ""
+
+            separator
+            echo -e "${C_WHITE}--- Key Monitoring Commands ---${C_RESET}"
+            echo ""
+            echo "  1. nodetool netstats — active streaming sessions"
+            log_cmd "docker exec hcd-node1 nodetool netstats 2>/dev/null | head -20 || echo '(netstats — no active streams in idle cluster)'"
+            echo ""
+            echo "  When streaming is active, netstats shows:"
+            echo "    Receiving: 150 MB from /172.28.0.3 (progress: 45%)"
+            echo "    Sending:  200 MB to /172.28.0.5 (progress: 60%)"
+            echo ""
+
+            echo "  2. nodetool compactionstats — compaction triggered by streaming"
+            log_cmd "docker exec hcd-node1 nodetool compactionstats 2>/dev/null || echo '(compactionstats)'"
+
+            echo ""
+            echo "  3. nodetool status — node state (UJ=joining, UL=leaving, UN=normal)"
+            log_cmd "docker exec hcd-node1 nodetool status 2>/dev/null | head -15 || echo '(nodetool status)'"
+
+            separator
+            echo -e "${C_WHITE}--- Stream Rate Limiting ---${C_RESET}"
+            echo ""
+            echo "  ┌──────────────────────────────────────────────────────────────────┐"
+            echo "  │  stream_throughput_outbound_megabits_per_sec: 200 (default)      │"
+            echo "  │                                                                   │"
+            echo "  │  This limits how fast data is sent during streaming/repair.      │"
+            echo "  │  Without throttling, streaming can saturate the network and       │"
+            echo "  │  cause read/write timeouts on production traffic.                │"
+            echo "  │                                                                   │"
+            echo "  │  Dynamic adjustment (no restart needed):                         │"
+            echo "  │    nodetool setstreamthroughput 100   # reduce to 100 Mbps      │"
+            echo "  │    nodetool getstreamthroughput       # check current value      │"
+            echo "  │                                                                   │"
+            echo "  │  inter_dc_stream_throughput:                                     │"
+            echo "  │    Separate limit for cross-DC streaming (WAN is expensive).     │"
+            echo "  │    Default: 200 Mbps. Set lower for WAN links.                   │"
+            echo "  └──────────────────────────────────────────────────────────────────┘"
+            echo ""
+
+            log_cmd "docker exec hcd-node1 nodetool getstreamthroughput 2>/dev/null || echo '(stream throughput)'"
+
+            separator
+            echo -e "${C_WHITE}--- Adding a Node: What It Would Look Like ---${C_RESET}"
+            echo ""
+            echo "  To add a 7th node to this cluster:"
+            echo ""
+            echo "  1. Add to docker-compose.yml:"
+            echo "     hcd-node7:"
+            echo "       <<: *hcd-common"
+            echo "       container_name: hcd-node7"
+            echo "       environment:"
+            echo "         CASSANDRA_SEEDS: 172.28.0.2,172.28.0.5"
+            echo "         CASSANDRA_LISTEN_ADDRESS: 172.28.0.8"
+            echo "         CASSANDRA_DC: dc1"
+            echo "         CASSANDRA_RACK: rack1"
+            echo "       networks:"
+            echo "         hcd-cluster:"
+            echo "           ipv4_address: 172.28.0.8"
+            echo ""
+            echo "  2. Start the new node:"
+            echo "     docker compose up -d hcd-node7"
+            echo ""
+            echo "  3. Monitor bootstrap:"
+            echo "     watch -n 5 'docker exec hcd-node7 nodetool netstats'"
+            echo "     docker exec hcd-node1 nodetool status  # watch for UJ→UN"
+            echo ""
+            echo "  4. After UN, run cleanup on existing nodes:"
+            echo "     for n in 1 2 3 4 5 6; do"
+            echo "       docker exec hcd-node\$n nodetool cleanup rf_prod"
+            echo "     done"
+            echo ""
+
+            separator
+            echo -e "${C_WHITE}--- Bootstrap Time Estimation ---${C_RESET}"
+            echo ""
+            echo "  ┌──────────────────────┬───────────────┬──────────────────────────┐"
+            echo "  │ Data per Node        │ Stream Rate   │ Estimated Bootstrap Time │"
+            echo "  ├──────────────────────┼───────────────┼──────────────────────────┤"
+            echo "  │ 10 GB                │ 200 Mbps      │ ~7 minutes               │"
+            echo "  │ 100 GB               │ 200 Mbps      │ ~70 minutes              │"
+            echo "  │ 1 TB                 │ 200 Mbps      │ ~12 hours                │"
+            echo "  │ 1 TB                 │ 400 Mbps      │ ~6 hours                 │"
+            echo "  └──────────────────────┴───────────────┴──────────────────────────┘"
+            echo ""
+            echo "  Note: Add 30-50% for compaction overhead after streaming."
+            echo ""
+
+            echo -e "${C_YELLOW}QUESTION: Why does HCD rate-limit streaming by default?${C_RESET}"
+            pause
+            echo -e "${C_GREEN}ANSWER: Unthrottled streaming can saturate disk I/O and network bandwidth,${C_RESET}"
+            echo -e "${C_GREEN}causing read/write timeouts on production traffic. The default 200 Mbps${C_RESET}"
+            echo -e "${C_GREEN}limit protects existing workloads. Use nodetool setstreamthroughput to${C_RESET}"
+            echo -e "${C_GREEN}increase it during maintenance windows when client traffic is low.${C_RESET}"
+            echo ""
+
+            takeaway "Streaming is the data transfer mechanism for bootstrap, repair, and decommission." \
+                     "Monitor with: nodetool netstats (streams), status (UJ/UL/UN), compactionstats." \
+                     "Rate limiting (200 Mbps default) protects production traffic during operations." \
+                     "Use nodetool setstreamthroughput for dynamic adjustment without restart." \
+                     "Always run 'nodetool cleanup' on old nodes after adding a new node."
+
+            challenge "Check your current stream throughput: nodetool getstreamthroughput" \
+                      "Set it to 50 Mbps: nodetool setstreamthroughput 50" \
+                      "Restore it: nodetool setstreamthroughput 200"
+            ;;
+        68)
+            header 68 "Materialized Views — Server-Side Denormalization"
+            echo "Materialized Views (MVs) automatically maintain a denormalized copy"
+            echo "of a base table, sorted by different columns. Writes to the base"
+            echo "table automatically propagate to the view."
+            echo ""
+
+            # ─── MV Concept ─────────────────────────────────────────
+            echo -e "${C_WHITE}--- How Materialized Views Work ---${C_RESET}"
+            echo ""
+            echo "  ┌──────────────────────────────────────────────────────────────────┐"
+            echo "  │  Base Table: users (user_id PK, name, dept, email, created_at)  │"
+            echo "  │                                                                   │"
+            echo "  │  MV: users_by_dept (dept PK, user_id CK)                        │"
+            echo "  │    → Automatically populated from base table                    │"
+            echo "  │    → Every INSERT/UPDATE/DELETE on base → reflected in MV       │"
+            echo "  │                                                                   │"
+            echo "  │  Without MV: you must maintain 2 tables in application code     │"
+            echo "  │  With MV: HCD handles it automatically (but with caveats)       │"
+            echo "  └──────────────────────────────────────────────────────────────────┘"
+            echo ""
+
+            separator
+            echo -e "${C_WHITE}--- Demo: Create Base Table + MV ---${C_RESET}"
+            log_cmd "docker exec hcd-node1 cqlsh -e \"CREATE TABLE IF NOT EXISTS rf_prod.users_base (user_id int PRIMARY KEY, name text, dept text, email text, created_at timestamp);\""
+            log_cmd "docker exec hcd-node1 cqlsh -e \"CREATE MATERIALIZED VIEW IF NOT EXISTS rf_prod.users_by_dept AS SELECT user_id, name, dept, email, created_at FROM rf_prod.users_base WHERE dept IS NOT NULL AND user_id IS NOT NULL PRIMARY KEY (dept, user_id);\""
+
+            separator
+            echo -e "${C_WHITE}--- Insert into Base Table ---${C_RESET}"
+            if [ "$DRY_RUN" = false ]; then
+                docker exec hcd-node1 cqlsh -e "INSERT INTO rf_prod.users_base (user_id, name, dept, email, created_at) VALUES (1, 'Alice', 'Engineering', 'alice@example.com', toTimestamp(now()));" 2>/dev/null
+                docker exec hcd-node1 cqlsh -e "INSERT INTO rf_prod.users_base (user_id, name, dept, email, created_at) VALUES (2, 'Bob', 'Engineering', 'bob@example.com', toTimestamp(now()));" 2>/dev/null
+                docker exec hcd-node1 cqlsh -e "INSERT INTO rf_prod.users_base (user_id, name, dept, email, created_at) VALUES (3, 'Carol', 'Marketing', 'carol@example.com', toTimestamp(now()));" 2>/dev/null
+                docker exec hcd-node1 cqlsh -e "INSERT INTO rf_prod.users_base (user_id, name, dept, email, created_at) VALUES (4, 'Dave', 'Marketing', 'dave@example.com', toTimestamp(now()));" 2>/dev/null
+                docker exec hcd-node1 cqlsh -e "INSERT INTO rf_prod.users_base (user_id, name, dept, email, created_at) VALUES (5, 'Eve', 'Security', 'eve@example.com', toTimestamp(now()));" 2>/dev/null
+                echo -e "${C_GREEN}[EXEC]${C_RESET} 5 users inserted into base table."
+            else
+                echo -e "${C_YELLOW}[DRY-RUN]${C_RESET} INSERT INTO rf_prod.users_base ... (5 users: Engineering, Marketing, Security)"
+            fi
+
+            separator
+            echo -e "${C_WHITE}--- Query Base Table vs MV ---${C_RESET}"
+            echo ""
+            echo "  Base table — query by user_id (partition key):"
+            log_cmd "docker exec hcd-node1 cqlsh -e \"SELECT * FROM rf_prod.users_base WHERE user_id = 1;\" 2>&1 | tail -n 5 || echo '(base table query)'"
+            echo ""
+            echo "  Materialized View — query by department (MV partition key):"
+            log_cmd "docker exec hcd-node1 cqlsh -e \"SELECT * FROM rf_prod.users_by_dept WHERE dept = 'Engineering';\" 2>&1 | tail -n 5 || echo '(MV query)'"
+            lookfor "MV query returns Alice and Bob (Engineering dept) — auto-populated from base table."
+
+            separator
+            echo -e "${C_WHITE}--- Write-Through Demo ---${C_RESET}"
+            echo "  Insert a new user into base table → appears in MV automatically:"
+            log_cmd "docker exec hcd-node1 cqlsh -e \"INSERT INTO rf_prod.users_base (user_id, name, dept, email, created_at) VALUES (6, 'Frank', 'Engineering', 'frank@example.com', toTimestamp(now()));\""
+            log_cmd "docker exec hcd-node1 cqlsh -e \"SELECT name FROM rf_prod.users_by_dept WHERE dept = 'Engineering';\" 2>&1 | tail -n 6 || echo '(MV after insert)'"
+            lookfor "Frank now appears in the Engineering view — zero application code needed."
+
+            separator
+            echo -e "${C_WHITE}--- MV Caveats & Production Risks ---${C_RESET}"
+            echo ""
+            echo "  ┌──────────────────────────┬──────────────────────────────────────┐"
+            echo "  │ Issue                    │ Impact                                │"
+            echo "  ├──────────────────────────┼──────────────────────────────────────┤"
+            echo "  │ Write amplification      │ Every base write → MV write (+2x)   │"
+            echo "  │ Eventual consistency     │ MV may lag behind base table         │"
+            echo "  │ Silent sync failure      │ MV can drift with no alert           │"
+            echo "  │ No partial rebuild       │ Fix requires DROP + CREATE MV        │"
+            echo "  │ Repair cost              │ Repair must cover base + all MVs     │"
+            echo "  │ No aggregates/functions  │ MV is a subset, not a transform      │"
+            echo "  └──────────────────────────┴──────────────────────────────────────┘"
+            echo ""
+            echo "  ┌──────────────────────────────────────────────────────────────────┐"
+            echo "  │  RECOMMENDATION:                                                 │"
+            echo "  │                                                                   │"
+            echo "  │  MVs are fine for:     Low-volume, read-heavy, non-critical     │"
+            echo "  │  Avoid MVs for:        High-volume writes, SLA-critical reads   │"
+            echo "  │  Alternative:          Manual denormalization in application     │"
+            echo "  │                        (more code, but fully predictable)        │"
+            echo "  └──────────────────────────────────────────────────────────────────┘"
+            echo ""
+
+            separator
+            echo -e "${C_WHITE}--- Cleanup ---${C_RESET}"
+            log_cmd "docker exec hcd-node1 cqlsh -e \"DROP MATERIALIZED VIEW IF EXISTS rf_prod.users_by_dept;\""
+            log_cmd "docker exec hcd-node1 cqlsh -e \"DROP TABLE IF EXISTS rf_prod.users_base;\""
+
+            echo ""
+            echo -e "${C_YELLOW}QUESTION: Why do many production teams avoid materialized views?${C_RESET}"
+            pause
+            echo -e "${C_GREEN}ANSWER: MVs add hidden write amplification (every base write triggers an MV${C_RESET}"
+            echo -e "${C_GREEN}mutation), can fall out of sync silently (no built-in alert), and the only${C_RESET}"
+            echo -e "${C_GREEN}fix is DROP + CREATE (full rebuild). Manual denormalization with application-${C_RESET}"
+            echo -e "${C_GREEN}managed tables is more code but fully predictable and debuggable.${C_RESET}"
+            echo ""
+
+            takeaway "MVs auto-maintain denormalized views — zero application code for read optimization." \
+                     "Write amplification: every base table mutation triggers a MV mutation (+2x I/O)." \
+                     "MVs can silently fall out of sync — no built-in consistency alert." \
+                     "Only fix for a drifted MV: DROP + CREATE (full data rebuild)." \
+                     "For high-volume or SLA-critical workloads, prefer manual denormalization."
+
+            challenge "Create a second MV on users_base partitioned by 'created_at' (for time-range queries)." \
+                      "Insert 100 rows and compare write latency with 0 MVs vs 1 MV vs 2 MVs." \
+                      "Measure the write amplification factor."
+            ;;
+        69)
+            header 69 "Nodetool Ops Deep-Dive — Systematic Troubleshooting"
+            echo "nodetool is the primary operational interface for HCD. This module"
+            echo "covers the essential commands for monitoring, debugging, and"
+            echo "capacity planning — and how to combine them into a troubleshooting workflow."
+            echo ""
+
+            # ─── tablestats ─────────────────────────────────────────
+            echo -e "${C_WHITE}--- 1. tablestats — Per-Table Metrics ---${C_RESET}"
+            echo ""
+            echo "  Shows read/write latency, partition size, SSTable count, bloom filter stats."
+            echo ""
+            log_cmd "docker exec hcd-node1 nodetool tablestats rf_prod 2>/dev/null | head -30 || echo '(tablestats output)'"
+            echo ""
+            echo "  Key metrics to watch:"
+            echo "    Read Latency (p99):    Target < 10ms for OLTP workloads"
+            echo "    Write Latency (p99):   Target < 5ms"
+            echo "    SSTable count:         High count → compaction behind"
+            echo "    Partition size (avg):  Watch for unbounded growth"
+            echo "    Bloom filter FP ratio: Should be < 1% (0.01)"
+            echo ""
+
+            separator
+            echo -e "${C_WHITE}--- 2. tpstats — Thread Pool Statistics ---${C_RESET}"
+            echo ""
+            echo "  Shows activity in HCD's internal thread pools (stages)."
+            echo ""
+            log_cmd "docker exec hcd-node1 nodetool tpstats 2>/dev/null | head -25 || echo '(tpstats output)'"
+            echo ""
+            echo "  Critical stages:"
+            echo "    MutationStage:     Write processing"
+            echo "    ReadStage:         Read processing"
+            echo "    ReadRepairStage:   Background consistency repair"
+            echo "    HintedHandoff:     Delivering hints to recovered nodes"
+            echo "    CompactionExecutor: SSTable compaction"
+            echo ""
+            echo "  RED FLAGS:"
+            echo "    Active > 0:        Normal under load"
+            echo "    Pending > 100:     Backpressure — stage is overloaded"
+            echo "    Blocked > 0:       Serious problem — requests being rejected"
+            echo "    All time blocked:  Historical blocks — investigate root cause"
+            echo ""
+
+            separator
+            echo -e "${C_WHITE}--- 3. proxyhistograms — Latency Distribution ---${C_RESET}"
+            echo ""
+            echo "  Shows read/write/range latency percentiles as seen by the coordinator."
+            echo ""
+            log_cmd "docker exec hcd-node1 nodetool proxyhistograms 2>/dev/null || echo '(proxyhistograms output)'"
+            echo ""
+            echo "  Key insight: p99 vs p50 ratio reveals tail latency."
+            echo "  If p99/p50 > 10x: investigate GC pauses, compaction, or disk I/O."
+            echo ""
+
+            separator
+            echo -e "${C_WHITE}--- 4. compactionstats — Live Compaction Progress ---${C_RESET}"
+            echo ""
+            log_cmd "docker exec hcd-node1 nodetool compactionstats 2>/dev/null || echo '(compactionstats output)'"
+            echo ""
+            echo "  Pending compactions > 0: compaction is behind."
+            echo "  Sustained pending > 50: increase compaction throughput or add nodes."
+            echo ""
+
+            separator
+            echo -e "${C_WHITE}--- 5. info — Node-Level Summary ---${C_RESET}"
+            echo ""
+            log_cmd "docker exec hcd-node1 nodetool info 2>/dev/null | head -20 || echo '(nodetool info)'"
+            echo ""
+            echo "  Key cache, row cache, counter cache hit ratios."
+            echo "  Heap usage, uptime, data center, rack."
+            echo ""
+
+            separator
+            echo -e "${C_WHITE}--- Troubleshooting Decision Tree ---${C_RESET}"
+            echo ""
+            echo "  ┌──────────────────────────────────────────────────────────────────┐"
+            echo "  │  READS SLOW?                                                     │"
+            echo "  │  1. proxyhistograms → check read p99                            │"
+            echo "  │  2. tpstats → ReadStage pending/blocked?                        │"
+            echo "  │     YES → capacity issue → add nodes or reduce load             │"
+            echo "  │     NO  → 3. tablestats → SSTable count high?                   │"
+            echo "  │            YES → compaction behind → check compactionstats      │"
+            echo "  │            NO  → 4. Check partition size (hot partitions?)       │"
+            echo "  │                                                                   │"
+            echo "  │  WRITES SLOW?                                                    │"
+            echo "  │  1. tpstats → MutationStage pending/blocked?                    │"
+            echo "  │     YES → 2. compactionstats → pending compactions?             │"
+            echo "  │            YES → compaction bottleneck                           │"
+            echo "  │            NO  → commitlog I/O bottleneck                       │"
+            echo "  │     NO  → 3. Network issue → check inter-node latency           │"
+            echo "  │                                                                   │"
+            echo "  │  DROPPED MESSAGES?                                               │"
+            echo "  │  tpstats → Dropped > 0 for any stage                            │"
+            echo "  │  → Capacity crisis: add nodes, reduce load, or tune timeouts    │"
+            echo "  └──────────────────────────────────────────────────────────────────┘"
+            echo ""
+
+            echo -e "${C_YELLOW}QUESTION: Which nodetool command would you check first if reads are slow?${C_RESET}"
+            pause
+            echo -e "${C_GREEN}ANSWER: 'proxyhistograms' for the latency distribution (is it p50 or p99?),${C_RESET}"
+            echo -e "${C_GREEN}then 'tpstats' for blocked ReadStage threads (capacity issue?), then${C_RESET}"
+            echo -e "${C_GREEN}'tablestats' for SSTable count (compaction behind?). This systematic${C_RESET}"
+            echo -e "${C_GREEN}approach narrows the root cause in 3 steps.${C_RESET}"
+            echo ""
+
+            takeaway "tablestats: per-table latency, SSTable count, partition size, bloom filter FP." \
+                     "tpstats: thread pool activity — Pending/Blocked/Dropped are red flags." \
+                     "proxyhistograms: coordinator-side latency percentiles (p50, p99, p999)." \
+                     "compactionstats: live compaction progress — pending > 50 is concerning." \
+                     "Systematic workflow: proxyhistograms → tpstats → tablestats → compactionstats."
+
+            challenge "Write a one-liner that checks for dropped messages:" \
+                      "docker exec hcd-node1 nodetool tpstats | awk '/Dropped/{found=1} found && \$NF>0'" \
+                      "Run it every 30 seconds with 'watch' during a load test."
+            ;;
+        70)
+            header 70 "Cross-DC Consistency Window"
+            echo "LOCAL_QUORUM guarantees consistency within ONE datacenter."
+            echo "Cross-DC replication is asynchronous — dc2 can lag behind dc1."
+            echo "This module demonstrates the divergence window during a DC partition."
+            echo ""
+
+            # ─── Cross-DC Model ─────────────────────────────────────
+            echo -e "${C_WHITE}--- Cross-DC Replication Model ---${C_RESET}"
+            echo ""
+            echo "  ┌──────────────────────────────────────────────────────────────────┐"
+            echo "  │  LOCAL_QUORUM write in dc1:                                      │"
+            echo "  │    1. Coordinator sends to 3 replicas in dc1                    │"
+            echo "  │    2. Waits for 2 ACKs (quorum of dc1)                          │"
+            echo "  │    3. Returns success to client                                  │"
+            echo "  │    4. ASYNC: sends to 3 replicas in dc2 (no wait)               │"
+            echo "  │                                                                   │"
+            echo "  │  → dc2 replicas may lag behind dc1 by milliseconds to seconds   │"
+            echo "  │  → During a network partition: dc2 sees STALE data              │"
+            echo "  │  → After partition heals: dc2 catches up via hints + repair     │"
+            echo "  └──────────────────────────────────────────────────────────────────┘"
+            echo ""
+
+            separator
+            echo -e "${C_WHITE}--- Demo: Partition DCs and Observe Divergence ---${C_RESET}"
+            echo ""
+
+            log_cmd "docker exec hcd-node1 cqlsh -e \"CREATE TABLE IF NOT EXISTS rf_prod.cross_dc_demo (id int PRIMARY KEY, data text, dc_written text);\""
+            log_cmd "docker exec hcd-node1 cqlsh -e \"TRUNCATE rf_prod.cross_dc_demo;\""
+
+            echo ""
+            echo "  Step 1: Write baseline data (both DCs connected)"
+            if [ "$DRY_RUN" = false ]; then
+                for i in $(seq 1 5); do
+                    docker exec hcd-node1 cqlsh -e "INSERT INTO rf_prod.cross_dc_demo (id, data, dc_written) VALUES ($i, 'baseline-$i', 'dc1');" 2>/dev/null
+                done
+                echo -e "${C_GREEN}[EXEC]${C_RESET} 5 baseline rows written (both DCs receive them)."
+            else
+                echo -e "${C_YELLOW}[DRY-RUN]${C_RESET} INSERT INTO rf_prod.cross_dc_demo ... (5 baseline rows)"
+            fi
+
+            separator
+            echo -e "${C_WHITE}--- Partition: Disconnect dc2 from the network ---${C_RESET}"
+            if [ "$DRY_RUN" = false ]; then
+                log_info "Disconnecting dc2 nodes (node4, node5, node6) from network..."
+                for node in hcd-node4 hcd-node5 hcd-node6; do
+                    docker network disconnect "${HCD_NETWORK}" "$node" 2>/dev/null || true
+                done
+                sleep 3
+                echo -e "${C_GREEN}[EXEC]${C_RESET} dc2 nodes disconnected — network partition active."
+            else
+                echo -e "${C_YELLOW}[DRY-RUN]${C_RESET} docker network disconnect ${HCD_NETWORK} hcd-node4/5/6"
+            fi
+
+            echo ""
+            echo "  Step 2: Write 10 rows in dc1 (dc2 cannot receive them)"
+            if [ "$DRY_RUN" = false ]; then
+                for i in $(seq 6 15); do
+                    docker exec hcd-node1 cqlsh -e "CONSISTENCY LOCAL_QUORUM; INSERT INTO rf_prod.cross_dc_demo (id, data, dc_written) VALUES ($i, 'during-partition-$i', 'dc1-only');" 2>/dev/null
+                done
+                echo -e "${C_GREEN}[EXEC]${C_RESET} 10 rows written in dc1 during partition."
+            else
+                echo -e "${C_YELLOW}[DRY-RUN]${C_RESET} INSERT INTO rf_prod.cross_dc_demo ... (10 rows, LOCAL_QUORUM in dc1)"
+            fi
+
+            echo ""
+            echo "  dc1 now has 15 rows. dc2 has only the 5 baseline rows."
+            echo "  This is the CONSISTENCY WINDOW — dc2 is stale."
+            echo ""
+
+            separator
+            echo -e "${C_WHITE}--- Heal: Reconnect dc2 ---${C_RESET}"
+            if [ "$DRY_RUN" = false ]; then
+                log_info "Reconnecting dc2 nodes to network..."
+                for node in hcd-node4 hcd-node5 hcd-node6; do
+                    docker network connect "${HCD_NETWORK}" "$node" 2>/dev/null || true
+                done
+                echo -e "${C_GREEN}[EXEC]${C_RESET} dc2 nodes reconnected."
+                log_info "Waiting for gossip convergence (15s)..."
+                sleep 15
+            else
+                echo -e "${C_YELLOW}[DRY-RUN]${C_RESET} docker network connect ${HCD_NETWORK} hcd-node4/5/6"
+                echo -e "${C_YELLOW}[DRY-RUN]${C_RESET} sleep 15 (gossip convergence)"
+            fi
+
+            echo ""
+            echo "  Step 3: Check dc2 consistency"
+            log_cmd "docker exec hcd-node1 cqlsh -e \"CONSISTENCY ALL; SELECT count(*) FROM rf_prod.cross_dc_demo;\" 2>&1 | tail -n 5 || echo '(ALL — may trigger read repair)'"
+            echo ""
+            echo "  Reading at CL=ALL forces read repair — all replicas must respond."
+            echo "  After this read, dc2 replicas receive the missing 10 rows."
+            echo ""
+
+            lookfor "Count should converge to 15 after read repair or hint delivery."
+            lookfor "The consistency window was the time between partition and convergence."
+
+            separator
+            echo -e "${C_WHITE}--- Consistency Level Comparison ---${C_RESET}"
+            echo ""
+            echo "  ┌──────────────────────┬────────────────┬──────────────────────────┐"
+            echo "  │ Consistency Level    │ Scope          │ Cross-DC Guarantee       │"
+            echo "  ├──────────────────────┼────────────────┼──────────────────────────┤"
+            echo "  │ LOCAL_ONE            │ 1 node, local  │ None                     │"
+            echo "  │ LOCAL_QUORUM         │ Quorum, local  │ None (async replication) │"
+            echo "  │ EACH_QUORUM          │ Quorum, each DC│ YES (waits for all DCs) │"
+            echo "  │ ALL                  │ All replicas   │ YES (all must respond)  │"
+            echo "  └──────────────────────┴────────────────┴──────────────────────────┘"
+            echo ""
+            echo "  EACH_QUORUM guarantees cross-DC consistency but adds WAN latency."
+            echo "  LOCAL_QUORUM is the recommended default — accept async cross-DC lag."
+            echo ""
+
+            separator
+            echo -e "${C_WHITE}--- Cleanup ---${C_RESET}"
+            log_cmd "docker exec hcd-node1 cqlsh -e \"DROP TABLE IF EXISTS rf_prod.cross_dc_demo;\""
+
+            echo ""
+            echo -e "${C_YELLOW}QUESTION: If you use LOCAL_QUORUM for both reads and writes,${C_RESET}"
+            echo -e "${C_YELLOW}can you still see stale data in another DC?${C_RESET}"
+            pause
+            echo -e "${C_GREEN}ANSWER: Yes! LOCAL_QUORUM is per-DC. Cross-DC replication is asynchronous.${C_RESET}"
+            echo -e "${C_GREEN}A read in dc2 at LOCAL_QUORUM may return stale data if the async replication${C_RESET}"
+            echo -e "${C_GREEN}hasn't arrived yet. The staleness window is typically milliseconds, but during${C_RESET}"
+            echo -e "${C_GREEN}a network partition it can be minutes or hours. Use EACH_QUORUM if you need${C_RESET}"
+            echo -e "${C_GREEN}cross-DC consistency (at the cost of WAN latency on every write).${C_RESET}"
+            echo ""
+
+            takeaway "LOCAL_QUORUM is per-DC — cross-DC replication is asynchronous." \
+                     "During a DC partition, the remote DC sees stale data (consistency window)." \
+                     "After partition heals: hints + read repair + repair close the window." \
+                     "EACH_QUORUM waits for quorum in EVERY DC — guaranteed cross-DC consistency." \
+                     "Trade-off: LOCAL_QUORUM (fast, eventual cross-DC) vs EACH_QUORUM (slow, strong)."
+
+            challenge "Write at EACH_QUORUM and measure the latency difference vs LOCAL_QUORUM:" \
+                      "CONSISTENCY EACH_QUORUM; INSERT INTO rf_prod.entropy_test (id, value) VALUES (999, 'each-q');" \
+                      "Compare with CONSISTENCY LOCAL_QUORUM for the same write."
+            ;;
+        71)
+            header 71 "Bloom Filter & Cache Tuning"
+            echo "Bloom filters and caches are HCD's read-path optimizations."
+            echo "Tuning them correctly can reduce read latency by 10-50%."
+            echo ""
+
+            # ─── Bloom Filters ──────────────────────────────────────
+            echo -e "${C_WHITE}--- Bloom Filters: 'Definitely Not Here' or 'Maybe Here' ---${C_RESET}"
+            echo ""
+            echo "  ┌──────────────────────────────────────────────────────────────────┐"
+            echo "  │  Read Path (per SSTable):                                        │"
+            echo "  │                                                                   │"
+            echo "  │  1. Check BLOOM FILTER: is this partition key in this SSTable?   │"
+            echo "  │     → 'No'  (definite) → SKIP this SSTable entirely            │"
+            echo "  │     → 'Maybe' (probabilistic) → continue to step 2             │"
+            echo "  │                                                                   │"
+            echo "  │  2. Check PARTITION INDEX: find exact position on disk           │"
+            echo "  │  3. Read DATA from SSTable                                       │"
+            echo "  │                                                                   │"
+            echo "  │  False positive: bloom says 'maybe' but key is NOT there        │"
+            echo "  │  → Wasted disk I/O (read SSTable for nothing)                   │"
+            echo "  │  → bloom_filter_fp_chance controls the FP rate                  │"
+            echo "  └──────────────────────────────────────────────────────────────────┘"
+            echo ""
+
+            separator
+            echo -e "${C_WHITE}--- Demo: Compare FP Rates ---${C_RESET}"
+            echo ""
+            echo "  Create tables with different bloom_filter_fp_chance values:"
+            log_cmd "docker exec hcd-node1 cqlsh -e \"CREATE TABLE IF NOT EXISTS rf_prod.bloom_tight (id int PRIMARY KEY, data text) WITH bloom_filter_fp_chance = 0.01;\""
+            log_cmd "docker exec hcd-node1 cqlsh -e \"CREATE TABLE IF NOT EXISTS rf_prod.bloom_loose (id int PRIMARY KEY, data text) WITH bloom_filter_fp_chance = 0.1;\""
+            log_cmd "docker exec hcd-node1 cqlsh -e \"CREATE TABLE IF NOT EXISTS rf_prod.bloom_wide (id int PRIMARY KEY, data text) WITH bloom_filter_fp_chance = 0.5;\""
+
+            echo ""
+            echo "  Insert same data into each:"
+            if [ "$DRY_RUN" = false ]; then
+                for i in $(seq 1 50); do
+                    docker exec hcd-node1 cqlsh -e "INSERT INTO rf_prod.bloom_tight (id, data) VALUES ($i, 'data-$i');" 2>/dev/null
+                    docker exec hcd-node1 cqlsh -e "INSERT INTO rf_prod.bloom_loose (id, data) VALUES ($i, 'data-$i');" 2>/dev/null
+                    docker exec hcd-node1 cqlsh -e "INSERT INTO rf_prod.bloom_wide (id, data) VALUES ($i, 'data-$i');" 2>/dev/null
+                done
+                echo -e "${C_GREEN}[EXEC]${C_RESET} 50 rows inserted into each table."
+                # Flush to create SSTables with bloom filters
+                docker exec hcd-node1 nodetool flush rf_prod 2>/dev/null
+                echo -e "${C_GREEN}[EXEC]${C_RESET} Tables flushed to disk (bloom filters materialized)."
+            else
+                echo -e "${C_YELLOW}[DRY-RUN]${C_RESET} INSERT INTO rf_prod.bloom_tight/loose/wide ... (50 rows each)"
+                echo -e "${C_YELLOW}[DRY-RUN]${C_RESET} nodetool flush rf_prod"
+            fi
+
+            separator
+            echo -e "${C_WHITE}--- Check Bloom Filter Settings ---${C_RESET}"
+            log_cmd "docker exec hcd-node1 cqlsh -e \"SELECT table_name, bloom_filter_fp_chance FROM system_schema.tables WHERE keyspace_name = 'rf_prod' AND table_name IN ('bloom_tight', 'bloom_loose', 'bloom_wide');\" 2>&1 | tail -n 8 || echo '(bloom filter settings)'"
+
+            separator
+            echo -e "${C_WHITE}--- FP Chance Trade-Offs ---${C_RESET}"
+            echo ""
+            echo "  ┌───────────────┬──────────────┬───────────────┬──────────────────┐"
+            echo "  │ fp_chance     │ FP Rate      │ Memory / Key  │ Best For         │"
+            echo "  ├───────────────┼──────────────┼───────────────┼──────────────────┤"
+            echo "  │ 0.001 (0.1%) │ Very low     │ ~20 bits      │ Latency-critical │"
+            echo "  │ 0.01  (1%)   │ Low (default)│ ~10 bits      │ General purpose  │"
+            echo "  │ 0.1   (10%)  │ Moderate     │ ~5 bits       │ Write-heavy      │"
+            echo "  │ 0.5   (50%)  │ High         │ ~1 bit        │ Rarely read      │"
+            echo "  │ 1.0   (off)  │ Always check │ 0 bits        │ Never (useless)  │"
+            echo "  └───────────────┴──────────────┴───────────────┴──────────────────┘"
+            echo ""
+            echo "  Lower fp_chance = larger bloom filter in memory = fewer wasted reads."
+            echo "  Higher fp_chance = smaller bloom filter = more false positives."
+            echo ""
+
+            separator
+            echo -e "${C_WHITE}--- Caches: Key Cache, Row Cache, Chunk Cache ---${C_RESET}"
+            echo ""
+            log_cmd "docker exec hcd-node1 nodetool info 2>/dev/null | grep -i cache || echo '(cache stats)'"
+            echo ""
+            echo "  ┌──────────────────────┬──────────────────────────────────────────┐"
+            echo "  │ Cache Type           │ Purpose                                   │"
+            echo "  ├──────────────────────┼──────────────────────────────────────────┤"
+            echo "  │ Key Cache            │ Maps partition keys → SSTable position   │"
+            echo "  │                      │ Avoids partition index lookup             │"
+            echo "  │                      │ Usually 5-10% of heap, high hit ratio   │"
+            echo "  ├──────────────────────┼──────────────────────────────────────────┤"
+            echo "  │ Row Cache            │ Caches entire partitions in memory       │"
+            echo "  │                      │ Disabled by default (too memory-hungry)  │"
+            echo "  │                      │ Invalidated on ANY mutation to partition │"
+            echo "  │                      │ Use only for read-heavy, rarely-updated │"
+            echo "  ├──────────────────────┼──────────────────────────────────────────┤"
+            echo "  │ Chunk Cache          │ Off-heap cache for SSTable chunks        │"
+            echo "  │                      │ Reduces disk I/O for repeated reads     │"
+            echo "  │                      │ Managed automatically by HCD             │"
+            echo "  └──────────────────────┴──────────────────────────────────────────┘"
+            echo ""
+
+            separator
+            echo -e "${C_WHITE}--- Key Cache Hit Ratio ---${C_RESET}"
+            echo ""
+            echo "  Target: > 85% hit ratio (ideal: > 95%)"
+            echo "  If low: increase key_cache_size_in_mb in cassandra.yaml"
+            echo "  If very low: check if working set exceeds cache size"
+            echo ""
+            log_cmd "docker exec hcd-node1 nodetool tablestats rf_prod 2>/dev/null | grep -A2 'Key cache' | head -5 || echo '(key cache stats per table)'"
+
+            separator
+            echo -e "${C_WHITE}--- Cleanup ---${C_RESET}"
+            log_cmd "docker exec hcd-node1 cqlsh -e \"DROP TABLE IF EXISTS rf_prod.bloom_tight;\""
+            log_cmd "docker exec hcd-node1 cqlsh -e \"DROP TABLE IF EXISTS rf_prod.bloom_loose;\""
+            log_cmd "docker exec hcd-node1 cqlsh -e \"DROP TABLE IF EXISTS rf_prod.bloom_wide;\""
+
+            echo ""
+            echo -e "${C_YELLOW}QUESTION: Why is the default bloom_filter_fp_chance 0.01 (1%) and not 0.001?${C_RESET}"
+            pause
+            echo -e "${C_GREEN}ANSWER: Lower fp_chance means larger bloom filters in memory. 0.01 (1%) uses${C_RESET}"
+            echo -e "${C_GREEN}~10 bits per key — a good balance between memory and read performance.${C_RESET}"
+            echo -e "${C_GREEN}0.001 would use ~20 bits per key, doubling memory for a 10x reduction in FP.${C_RESET}"
+            echo -e "${C_GREEN}For most workloads, 1% false positives is negligible. Only reduce for${C_RESET}"
+            echo -e "${C_GREEN}latency-critical read-heavy tables where every microsecond matters.${C_RESET}"
+            echo ""
+
+            takeaway "Bloom filters prevent unnecessary SSTable reads — essential for read performance." \
+                     "bloom_filter_fp_chance: 0.01 (default) is good; lower = more memory, fewer FPs." \
+                     "Key cache maps partition keys to disk positions — target > 85% hit ratio." \
+                     "Row cache is disabled by default — too memory-hungry, invalidated on any write." \
+                     "Tune per-table: high-read tables get tight blooms; write-heavy tables get loose."
+
+            challenge "Check bloom filter FP ratio on your busiest table:" \
+                      "nodetool tablestats rf_prod.<table> | grep 'Bloom filter false'" \
+                      "If > 5%, consider lowering bloom_filter_fp_chance and running upgradesstables."
             ;;
     esac
     pause

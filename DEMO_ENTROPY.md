@@ -1,13 +1,13 @@
 # HCD Entropy & Consistency Didactic Demo
 **Grade: A+ (97/100)**
 
-> **Executive Summary:** A 62-module interactive demo proving that IBM HCD delivers zero-downtime resilience, automatic self-healing, and tunable consistency across datacenters. Designed for live stakeholder presentations and hands-on engineering onboarding.
+> **Executive Summary:** A 72-module interactive demo proving that IBM HCD delivers zero-downtime resilience, automatic self-healing, and tunable consistency across datacenters. Designed for live stakeholder presentations and hands-on engineering onboarding.
 >
 > **Why this matters:** Unplanned database downtime costs enterprises $5,600-$9,000 per minute (Gartner). This demo proves — live, on your laptop — that HCD survives datacenter-level failures with zero data loss and zero application errors, eliminating the single largest source of availability risk in distributed data infrastructure.
 
 | | |
 |---|---|
-| **Modules** | 62 (0-61), organized in 7 parts |
+| **Modules** | 72 (0-71), organized in 8 parts |
 | **Cluster** | 6 nodes, 2 DCs, RF=3 per DC |
 | **Time (interactive)** | ~3-4 hours (full), ~20 min per part |
 | **Time (non-interactive)** | ~60-90 minutes |
@@ -31,7 +31,7 @@
     make demo                        # full interactive demo
     ./scripts/demo-entropy.sh 23     # jump to a specific module
     ./scripts/demo-entropy.sh --dry-run --no-pause  # dry-run, no cluster needed
-    ./scripts/demo-entropy.sh --score              # validate all 62 modules (scorecard)
+    ./scripts/demo-entropy.sh --score              # validate all 72 modules (scorecard)
     ```
     > **Single-module execution:** When jumping to Module N > 1, the script auto-creates the `rf_prod` keyspace via `ensure_rf_prod()` so prerequisites are satisfied.
 
@@ -167,7 +167,7 @@ This demo uses a 6-node, multi-DC cluster simulated in Docker.
 | 44 | Speculative Execution | Interactive Q + p99 drops to ~p50 with backup requests |
 | 45 | Live DC Failover with Driver (~3-5 min) | Zero errors during DC kill, RPO=0/RTO=1-3s |
 | 46 | Retry Policies Under Partition | pause+disconnect dual failure, 3 policies compared |
-| 47 | Demo Summary Dashboard | Visual recap of all 62 modules |
+| 47 | Demo Summary Dashboard | Visual recap of all 72 modules |
 
 #### Part 6 — Transactions & Patterns (Modules 48-53)
 | Module | Title | Key Proof |
@@ -190,6 +190,20 @@ This demo uses a 6-node, multi-DC cluster simulated in Docker.
 | 59 | Cross-Service Saga | Outbox pattern, payment timeout compensation, shipping failure refund, idempotency |
 | 60 | LWT Contention Under Load | 5 concurrent writers, Paxos 4-phase tracing, mitigation strategies |
 | 61 | Repair Deep-Dive | Merkle tree visualization, gc_grace zombie rows, 4 repair modes, production scheduling |
+
+#### Part 8 — Operational Deep-Dives (Modules 62-71)
+| Module | Title | Key Proof |
+|--------|-------|-----------|
+| 62 | Live RBAC Demo | PasswordAuthenticator, role creation, granular GRANT/REVOKE, permission denial, role inheritance |
+| 63 | Encryption at Rest (TDE) | Transparent data encryption config, encrypted SSTables (hexdump), key rotation workflow |
+| 64 | Commitlog Durability & Crash Recovery | docker kill (SIGKILL) crash, commitlog replay, zero data loss proof |
+| 65 | Hint Expiration & Data Gaps | Hint lifecycle, max_hint_window, expired hints → data gap, repair recovery |
+| 66 | Dynamic RF Change | ALTER KEYSPACE RF=1→3, empty replicas, QUORUM failure, repair to populate |
+| 67 | Streaming & Bootstrap Monitoring | netstats, bootstrap lifecycle, stream rate limiting, time estimation |
+| 68 | Materialized Views | Base table + MV, write-through, consistency risks, write amplification, production caveats |
+| 69 | Nodetool Ops Deep-Dive | tablestats, tpstats, proxyhistograms, compactionstats, troubleshooting decision tree |
+| 70 | Cross-DC Consistency Window | Network partition between DCs, LOCAL_QUORUM staleness, EACH_QUORUM trade-off |
+| 71 | Bloom Filter & Cache Tuning | bloom_filter_fp_chance, key cache hit ratio, row cache, chunk cache, FP trade-offs |
 
 ## Cleanup
 
@@ -1610,7 +1624,7 @@ This ensures the driver encounters both timeout and unavailable exceptions, maki
 
 A visual recap of everything covered in the demo, presented as an ASCII dashboard showing:
 
-- **Total modules**: 62 (0-61)
+- **Total modules**: 72 (0-71)
 - **What was proved**: Zero data loss during node/DC failure, automatic self-healing, LWW conflict resolution, rolling restart with zero downtime, automatic driver DC failover, p99 latency masking, safe banking transfers, saga compensation
 - **Topics covered**: Core, Indexing (SAI), Write Path, Multi-DC, Ops, Security, Data Modeling, Driver Policies, Transactions (ACID, Batches, LWT, Sagas)
 - **Key production takeaways**: LOCAL_QUORUM, TokenAwarePolicy, used_hosts_per_remote_dc, weekly repair, partition key design, monitoring, PasswordAuthenticator
