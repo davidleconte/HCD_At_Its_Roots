@@ -1,12 +1,30 @@
 x-hcd-common: &hcd-common
   build: .
   restart: on-failure:3
+  stop_grace_period: 120s
+  cap_drop:
+    - ALL
   cap_add:
     - NET_ADMIN
+  security_opt:
+    - no-new-privileges:true
+  ulimits:
+    nofile:
+      soft: 100000
+      hard: 100000
+    memlock:
+      soft: -1
+      hard: -1
+  logging:
+    driver: json-file
+    options:
+      max-size: "50m"
+      max-file: "3"
   deploy:
     resources:
       limits:
-        memory: 768M
+        cpus: "0.50"
+        memory: 1024M
   networks:
     hcd-cluster:
 
@@ -19,15 +37,17 @@ x-healthcheck: &hcd-healthcheck
 
 x-shared-env: &shared-env
   CASSANDRA_CLUSTER_NAME: ${CASSANDRA_CLUSTER_NAME:-HCDCluster}
-  CASSANDRA_SEEDS: 172.28.0.2,172.28.0.5
+  CASSANDRA_SEEDS: ${CASSANDRA_SEEDS:-172.28.0.2,172.28.0.5}
   CASSANDRA_RPC_ADDRESS: 0.0.0.0
   CASSANDRA_ENDPOINT_SNITCH: GossipingPropertyFileSnitch
+  MAX_HEAP_SIZE: ${MAX_HEAP_SIZE:-512M}
+  HEAP_NEWSIZE: ${HEAP_NEWSIZE:-100M}
   # JMX Prometheus exporter (active only when jmx_prometheus_javaagent.jar exists)
   JVM_EXTRA_OPTS: >-
     -javaagent:/opt/hcd/jmx_prometheus_javaagent.jar=9404:/opt/hcd/jmx-exporter.yml
 
 services:
-  # Datacenter 1
+  # ─── Datacenter 1 ──────────────────────────────────────────────────────────────
   hcd-node1:
     <<: *hcd-common
     container_name: hcd-node1
@@ -41,11 +61,10 @@ services:
       CASSANDRA_BROADCAST_ADDRESS: 172.28.0.2
       CASSANDRA_DC: dc1
       CASSANDRA_RACK: rack1
-      MAX_HEAP_SIZE: 512M
     volumes:
       - hcd-node1-data:/var/lib/cassandra
     ports:
-      - "9042:9042"
+      - "127.0.0.1:9042:9042"
     healthcheck:
       <<: *hcd-healthcheck
 
@@ -91,7 +110,7 @@ services:
     healthcheck:
       <<: *hcd-healthcheck
 
-  # Datacenter 2
+  # ─── Datacenter 2 ──────────────────────────────────────────────────────────────
   hcd-node4:
     <<: *hcd-common
     container_name: hcd-node4
@@ -155,6 +174,31 @@ services:
     healthcheck:
       <<: *hcd-healthcheck
 
+  # ─── MinIO WORM Storage (optional: docker compose --profile ransomware up) ───
+  minio:
+    image: minio/minio:RELEASE.2024-03-30T09-41-56Z
+    container_name: minio
+    profiles: ["ransomware"]
+    networks:
+      hcd-cluster:
+        ipv4_address: 172.28.0.10
+    ports:
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "mc ready local || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
   # ─── Observability Stack (optional: docker compose --profile monitoring up) ───
   prometheus:
     image: prom/prometheus:v2.51.0
@@ -164,13 +208,18 @@ services:
       hcd-cluster:
         ipv4_address: 172.28.0.20
     ports:
-      - "9090:9090"
+      - "127.0.0.1:9090:9090"
     volumes:
       - ./config/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus-data:/prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.retention.time=7d'
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 512M
     restart: unless-stopped
 
   grafana:
@@ -181,10 +230,10 @@ services:
       hcd-cluster:
         ipv4_address: 172.28.0.21
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     environment:
-      GF_SECURITY_ADMIN_USER: admin
-      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_SECURITY_ADMIN_USER: ${GF_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GF_ADMIN_PASSWORD:-admin}
       GF_AUTH_ANONYMOUS_ENABLED: "true"
       GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
     volumes:
@@ -193,6 +242,11 @@ services:
       - grafana-data:/var/lib/grafana
     depends_on:
       - prometheus
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 512M
     restart: unless-stopped
 
   # ─── Data API (optional: docker compose --profile api up) ───
@@ -204,7 +258,7 @@ services:
       hcd-cluster:
         ipv4_address: 172.28.0.30
     ports:
-      - "8181:8181"
+      - "127.0.0.1:8181:8181"
     environment:
       STARGATE_JSONAPI_OPERATIONS_DATABASE_CONFIG_CASSANDRA_END_POINTS: 172.28.0.2
       STARGATE_JSONAPI_OPERATIONS_DATABASE_CONFIG_LOCAL_DATACENTER: dc1
@@ -213,6 +267,7 @@ services:
     deploy:
       resources:
         limits:
+          cpus: "0.50"
           memory: 2G
     depends_on:
       hcd-node1:
@@ -239,5 +294,6 @@ volumes:
   hcd-node4-data:
   hcd-node5-data:
   hcd-node6-data:
+  minio-data:
   prometheus-data:
   grafana-data:

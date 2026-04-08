@@ -16,8 +16,8 @@ def test_dry_run_execution():
     result = run_demo("--dry-run", "--no-pause")
     assert result.returncode == 0, f"Script failed with stderr: {result.stderr}"
     assert "[DRY-RUN]" in result.stdout
-    # Verify all 72 module headers appear
-    for i in range(72):
+    # Verify all 79 module headers appear
+    for i in range(79):
         assert f"Module {i}:" in result.stdout, f"Module {i} header missing from full run"
 
 
@@ -32,19 +32,19 @@ def test_invalid_module():
     """Verify the script handles invalid module numbers gracefully."""
     result = run_demo("--dry-run", "99")
     assert "Invalid module number" in result.stdout
-    assert "Valid: 0-71" in result.stdout
+    assert "Valid: 0-78" in result.stdout
 
 
 def test_boundary_module_valid():
-    """Verify module 71 is accepted."""
-    result = run_demo("--dry-run", "--no-pause", "71")
+    """Verify module 78 is accepted."""
+    result = run_demo("--dry-run", "--no-pause", "78")
     assert result.returncode == 0
-    assert "Module 71:" in result.stdout
+    assert "Module 78:" in result.stdout
 
 
 def test_boundary_module_invalid():
-    """Verify module 72 is rejected."""
-    result = run_demo("--dry-run", "72")
+    """Verify module 79 is rejected."""
+    result = run_demo("--dry-run", "79")
     assert "Invalid module number" in result.stdout
 
 
@@ -96,346 +96,87 @@ def test_combined_flags():
     assert "[DRY-RUN]" in result.stdout
 
 
-def test_module_23_datacenter_kill_content():
-    """Verify module 23 has datacenter failover content."""
-    result = run_demo("--dry-run", "--no-pause", "23")
+def test_score_mode():
+    """Verify --score flag runs scorecard and reports 79/79 pass."""
+    result = run_demo("--score")
     assert result.returncode == 0
-    assert "dc_failover" in result.stdout, "Module 23 should reference dc_failover table"
-
-
-def test_module_25_cdc_content():
-    """Verify module 25 has CDC-specific content."""
-    result = run_demo("--dry-run", "--no-pause", "25")
-    assert result.returncode == 0
-    assert "cdc" in result.stdout.lower(), "Module 25 should reference CDC"
-
-
-def test_module_26_audit_content():
-    """Verify module 26 has audit logging content."""
-    result = run_demo("--dry-run", "--no-pause", "26")
-    assert result.returncode == 0
-    assert "enableauditlog" in result.stdout or "audit" in result.stdout.lower(), \
-        "Module 26 should reference audit logging"
-
-
-def test_module_27_guardrails_content():
-    """Verify module 27 has guardrails content."""
-    result = run_demo("--dry-run", "--no-pause", "27")
-    assert result.returncode == 0
-    assert "guardrail" in result.stdout.lower() or "batch" in result.stdout.lower(), \
-        "Module 27 should reference guardrails"
-
-
-def test_module_28_data_modeling_content():
-    """Verify module 28 has data modeling anti-pattern content."""
-    result = run_demo("--dry-run", "--no-pause", "28")
-    assert result.returncode == 0
-    assert "bad_model" in result.stdout or "partition" in result.stdout.lower(), \
-        "Module 28 should reference data modeling"
-
-
-def test_module_31_compaction_content():
-    """Verify module 31 has compaction strategy content."""
-    result = run_demo("--dry-run", "--no-pause", "31")
-    assert result.returncode == 0
-    assert "compaction" in result.stdout.lower() or "STCS" in result.stdout or "LCS" in result.stdout, \
-        "Module 31 should reference compaction strategies"
-
-
-def test_module_32_compression_content():
-    """Verify module 32 has compression content."""
-    result = run_demo("--dry-run", "--no-pause", "32")
-    assert result.returncode == 0
-    assert "compress" in result.stdout.lower() or "LZ4" in result.stdout or "Zstd" in result.stdout, \
-        "Module 32 should reference compression"
-
-
-def test_module_35_adding_dc_content():
-    """Verify module 35 has datacenter expansion content."""
-    result = run_demo("--dry-run", "--no-pause", "35")
-    assert result.returncode == 0
-    assert "rebuild" in result.stdout.lower() or "datacenter" in result.stdout.lower(), \
-        "Module 35 should reference adding a datacenter"
-
-
-def test_module_36_backup_content():
-    """Verify module 36 has backup and restore content."""
-    result = run_demo("--dry-run", "--no-pause", "36")
-    assert result.returncode == 0
-    assert "snapshot" in result.stdout.lower() or "backup" in result.stdout.lower(), \
-        "Module 36 should reference backup/snapshot"
-
-
-def test_module_39_repair_content():
-    """Verify module 39 has repair strategy content."""
-    result = run_demo("--dry-run", "--no-pause", "39")
-    assert result.returncode == 0
-    assert "repair" in result.stdout.lower(), \
-        "Module 39 should reference repair strategies"
-
-
-def test_module_41_security_content():
-    """Verify module 41 has security content."""
-    result = run_demo("--dry-run", "--no-pause", "41")
-    assert result.returncode == 0
-    assert "role" in result.stdout.lower() or "security" in result.stdout.lower(), \
-        "Module 41 should reference security"
-
-
-def test_module_42_geographic_content():
-    """Verify module 42 has geographic visualization content."""
-    result = run_demo("--dry-run", "--no-pause", "42")
-    assert result.returncode == 0
-    assert "endpoint" in result.stdout.lower() or "geographic" in result.stdout.lower() \
-        or "getendpoints" in result.stdout.lower(), \
-        "Module 42 should reference geographic visualization"
-
-
-def test_module_43_driver_policies_content():
-    """Verify module 43 has driver policy content."""
-    result = run_demo("--dry-run", "--no-pause", "43")
-    assert result.returncode == 0
-    assert "tokenaware" in result.stdout.lower() or "token-aware" in result.stdout.lower() \
-        or "driver-demo" in result.stdout, \
-        "Module 43 should reference TokenAware driver policies"
-
-
-def test_module_44_speculative_content():
-    """Verify module 44 has speculative execution content."""
-    result = run_demo("--dry-run", "--no-pause", "44")
-    assert result.returncode == 0
-    assert "speculative" in result.stdout.lower(), \
-        "Module 44 should reference speculative execution"
-
-
-def test_module_45_dc_failover_driver_content():
-    """Verify module 45 has driver DC failover content."""
-    result = run_demo("--dry-run", "--no-pause", "45")
-    assert result.returncode == 0
-    assert "dc-failover" in result.stdout or "failover" in result.stdout.lower(), \
-        "Module 45 should reference driver DC failover"
-
-
-def test_module_46_retry_policies_content():
-    """Verify module 46 has retry policy content."""
-    result = run_demo("--dry-run", "--no-pause", "46")
-    assert result.returncode == 0
-    assert "retry" in result.stdout.lower() or "fallthrough" in result.stdout.lower(), \
-        "Module 46 should reference retry policies"
-
-
-def test_module_47_summary_dashboard():
-    """Verify module 47 has summary dashboard content."""
-    result = run_demo("--dry-run", "--no-pause", "47")
-    assert result.returncode == 0
-    assert "SUMMARY DASHBOARD" in result.stdout, \
-        "Module 47 should contain the summary dashboard"
-
-
-def test_module_48_acid_content():
-    """Verify module 48 has ACID vs HCD content."""
-    result = run_demo("--dry-run", "--no-pause", "48")
-    assert result.returncode == 0
-    assert "acid" in result.stdout.lower() or "atomicity" in result.stdout.lower(), \
-        "Module 48 should reference ACID model"
-
-
-def test_module_49_batch_content():
-    """Verify module 49 has LOGGED/UNLOGGED batch content."""
-    result = run_demo("--dry-run", "--no-pause", "49")
-    assert result.returncode == 0
-    assert "logged" in result.stdout.lower() or "batchlog" in result.stdout.lower(), \
-        "Module 49 should reference LOGGED batch"
-
-
-def test_module_50_lost_update_content():
-    """Verify module 50 has lost update / read-modify-write content."""
-    result = run_demo("--dry-run", "--no-pause", "50")
-    assert result.returncode == 0
-    assert "lost update" in result.stdout.lower() or "compare-and-swap" in result.stdout.lower() \
-        or "accounts" in result.stdout, \
-        "Module 50 should reference the lost update problem"
-
-
-def test_module_51_banking_content():
-    """Verify module 51 has banking/payment content."""
-    result = run_demo("--dry-run", "--no-pause", "51")
-    assert result.returncode == 0
-    assert "bank" in result.stdout.lower() or "payment" in result.stdout.lower(), \
-        "Module 51 should reference banking/payments"
-
-
-def test_module_52_saga_content():
-    """Verify module 52 has saga pattern content."""
-    result = run_demo("--dry-run", "--no-pause", "52")
-    assert result.returncode == 0
-    assert "saga" in result.stdout.lower() or "compensat" in result.stdout.lower(), \
-        "Module 52 should reference saga pattern"
-
-
-def test_module_53_decision_framework():
-    """Verify module 53 has decision framework content."""
-    result = run_demo("--dry-run", "--no-pause", "53")
-    assert result.returncode == 0
-    assert "decision" in result.stdout.lower() or "golden rules" in result.stdout.lower(), \
-        "Module 53 should reference the decision framework"
-
-
-def test_module_54_data_api_content():
-    """Verify module 54 has Data API content."""
-    result = run_demo("--dry-run", "--no-pause", "54")
-    assert result.returncode == 0
-    assert "data api" in result.stdout.lower() or "rest" in result.stdout.lower() \
-        or "8181" in result.stdout, \
-        "Module 54 should reference Data API"
-
-
-def test_module_55_multi_tenant_content():
-    """Verify module 55 has multi-tenant content."""
-    result = run_demo("--dry-run", "--no-pause", "55")
-    assert result.returncode == 0
-    assert "tenant" in result.stdout.lower() or "isolation" in result.stdout.lower(), \
-        "Module 55 should reference multi-tenancy"
-
-
-def test_module_56_decommission_content():
-    """Verify module 56 has node decommission content."""
-    result = run_demo("--dry-run", "--no-pause", "56")
-    assert result.returncode == 0
-    assert "decommission" in result.stdout.lower() or "removenode" in result.stdout.lower(), \
-        "Module 56 should reference decommission"
-
-
-def test_module_57_disaster_recovery_content():
-    """Verify module 57 has disaster recovery content."""
-    result = run_demo("--dry-run", "--no-pause", "57")
-    assert result.returncode == 0
-    assert "snapshot" in result.stdout.lower() or "disaster" in result.stdout.lower() \
-        or "restore" in result.stdout.lower(), \
-        "Module 57 should reference disaster recovery"
-
-
-def test_module_58_corruption_content():
-    """Verify module 58 has silent data corruption content."""
-    result = run_demo("--dry-run", "--no-pause", "58")
-    assert result.returncode == 0
-    assert "corrupt" in result.stdout.lower() or "verify" in result.stdout.lower() \
-        or "scrub" in result.stdout.lower(), \
-        "Module 58 should reference data corruption detection"
-
-
-def test_module_59_cross_service_saga_content():
-    """Verify module 59 has cross-service saga content."""
-    result = run_demo("--dry-run", "--no-pause", "59")
-    assert result.returncode == 0
-    assert "saga" in result.stdout.lower() or "outbox" in result.stdout.lower() \
-        or "compensat" in result.stdout.lower(), \
-        "Module 59 should reference cross-service saga"
-
-
-def test_module_60_lwt_contention_content():
-    """Verify module 60 has LWT contention content."""
-    result = run_demo("--dry-run", "--no-pause", "60")
-    assert result.returncode == 0
-    assert "contention" in result.stdout.lower() or "paxos" in result.stdout.lower(), \
-        "Module 60 should reference LWT contention"
-
-
-def test_module_61_repair_deep_dive_content():
-    """Verify module 61 has repair deep-dive content."""
-    result = run_demo("--dry-run", "--no-pause", "61")
-    assert result.returncode == 0
-    assert "merkle" in result.stdout.lower() or "gc_grace" in result.stdout.lower() \
-        or "zombie" in result.stdout.lower(), \
-        "Module 61 should reference repair deep-dive concepts"
-
-
-def test_module_62_rbac_content():
-    """Verify module 62 has RBAC content."""
-    result = run_demo("--dry-run", "--no-pause", "62")
-    assert result.returncode == 0
-    assert "role" in result.stdout.lower() or "rbac" in result.stdout.lower() \
-        or "authenticator" in result.stdout.lower(), \
-        "Module 62 should reference RBAC"
-
-
-def test_module_63_tde_content():
-    """Verify module 63 has encryption at rest content."""
-    result = run_demo("--dry-run", "--no-pause", "63")
-    assert result.returncode == 0
-    assert "encrypt" in result.stdout.lower() or "tde" in result.stdout.lower(), \
-        "Module 63 should reference encryption"
-
-
-def test_module_64_commitlog_content():
-    """Verify module 64 has commitlog crash recovery content."""
-    result = run_demo("--dry-run", "--no-pause", "64")
-    assert result.returncode == 0
-    assert "commitlog" in result.stdout.lower() or "crash" in result.stdout.lower(), \
-        "Module 64 should reference commitlog recovery"
-
-
-def test_module_65_hint_expiration_content():
-    """Verify module 65 has hint expiration content."""
-    result = run_demo("--dry-run", "--no-pause", "65")
-    assert result.returncode == 0
-    assert "hint" in result.stdout.lower() or "max_hint_window" in result.stdout.lower(), \
-        "Module 65 should reference hint expiration"
-
-
-def test_module_66_rf_change_content():
-    """Verify module 66 has dynamic RF change content."""
-    result = run_demo("--dry-run", "--no-pause", "66")
-    assert result.returncode == 0
-    assert "replication" in result.stdout.lower() or "alter keyspace" in result.stdout.lower(), \
-        "Module 66 should reference replication factor change"
-
-
-def test_module_67_streaming_content():
-    """Verify module 67 has streaming/bootstrap content."""
-    result = run_demo("--dry-run", "--no-pause", "67")
-    assert result.returncode == 0
-    assert "stream" in result.stdout.lower() or "bootstrap" in result.stdout.lower() \
-        or "netstats" in result.stdout.lower(), \
-        "Module 67 should reference streaming"
-
-
-def test_module_68_mv_content():
-    """Verify module 68 has materialized view content."""
-    result = run_demo("--dry-run", "--no-pause", "68")
-    assert result.returncode == 0
-    assert "materialized" in result.stdout.lower() or "view" in result.stdout.lower(), \
-        "Module 68 should reference materialized views"
-
-
-def test_module_69_nodetool_content():
-    """Verify module 69 has nodetool ops content."""
-    result = run_demo("--dry-run", "--no-pause", "69")
-    assert result.returncode == 0
-    assert "tablestats" in result.stdout.lower() or "tpstats" in result.stdout.lower() \
-        or "proxyhistograms" in result.stdout.lower(), \
-        "Module 69 should reference nodetool operations"
-
-
-def test_module_70_cross_dc_content():
-    """Verify module 70 has cross-DC consistency content."""
-    result = run_demo("--dry-run", "--no-pause", "70")
-    assert result.returncode == 0
-    assert "disconnect" in result.stdout.lower() or "cross-dc" in result.stdout.lower() \
-        or "diverge" in result.stdout.lower() or "partition" in result.stdout.lower(), \
-        "Module 70 should reference cross-DC consistency"
-
-
-def test_module_71_bloom_filter_content():
-    """Verify module 71 has bloom filter/cache tuning content."""
-    result = run_demo("--dry-run", "--no-pause", "71")
-    assert result.returncode == 0
-    assert "bloom" in result.stdout.lower() or "cache" in result.stdout.lower() \
-        or "fp_chance" in result.stdout.lower(), \
-        "Module 71 should reference bloom filter or cache tuning"
-
-
-@pytest.mark.parametrize("module_id", [str(i) for i in range(72)])
+    assert "79" in result.stdout, "Scorecard should report 79 modules"
+    assert "PASS" in result.stdout, "Scorecard should show PASS results"
+    assert "100%" in result.stdout, "All modules should pass (100%)"
+
+
+# Parameterized content tests: verify each module produces expected keywords.
+# This replaces ~30 individual test functions with a single data-driven test.
+MODULE_CONTENT_EXPECTATIONS = [
+    ("23", ["dc_failover"]),
+    ("25", ["cdc"]),
+    ("26", ["enableauditlog", "audit"]),
+    ("27", ["guardrail", "batch"]),
+    ("28", ["bad_model", "partition"]),
+    ("31", ["compaction", "STCS", "LCS"]),
+    ("32", ["compress", "LZ4", "Zstd"]),
+    ("35", ["rebuild", "datacenter"]),
+    ("36", ["snapshot", "backup"]),
+    ("39", ["repair"]),
+    ("41", ["role", "security"]),
+    ("42", ["endpoint", "geographic", "getendpoints"]),
+    ("43", ["tokenaware", "token-aware", "driver-demo"]),
+    ("44", ["speculative"]),
+    ("45", ["dc-failover", "failover"]),
+    ("46", ["retry", "fallthrough"]),
+    ("47", ["SUMMARY DASHBOARD"]),
+    ("48", ["acid", "atomicity"]),
+    ("49", ["logged", "batchlog"]),
+    ("50", ["lost update", "compare-and-swap", "accounts"]),
+    ("51", ["bank", "payment"]),
+    ("52", ["saga", "compensat"]),
+    ("53", ["decision", "golden rules"]),
+    ("54", ["data api", "rest", "8181"]),
+    ("55", ["tenant", "isolation"]),
+    ("56", ["decommission", "removenode"]),
+    ("57", ["snapshot", "disaster", "restore"]),
+    ("58", ["corrupt", "verify", "scrub"]),
+    ("59", ["saga", "outbox", "compensat"]),
+    ("60", ["contention", "paxos"]),
+    ("61", ["merkle", "gc_grace", "zombie"]),
+    ("62", ["role", "rbac", "authenticator"]),
+    ("63", ["encrypt", "tde"]),
+    ("64", ["commitlog", "crash"]),
+    ("65", ["hint", "max_hint_window"]),
+    ("66", ["replication", "alter keyspace"]),
+    ("67", ["stream", "bootstrap", "netstats"]),
+    ("68", ["materialized", "view"]),
+    ("69", ["tablestats", "tpstats", "proxyhistograms"]),
+    ("70", ["disconnect", "cross-dc", "diverge", "partition"]),
+    ("71", ["bloom", "cache", "fp_chance"]),
+    ("72", ["dora", "ransomware"]),
+    ("73", ["snapshot", "worm", "integrity"]),
+    ("74", ["commitlog", "pitr", "archiv"]),
+    ("75", ["attack", "truncate", "ransom"]),
+    ("76", ["recovery", "restore", "worm"]),
+    ("77", ["failover", "disconnect", "datacenter", "partition"]),
+    ("78", ["k8ssandra", "kubernetes", "auto-heal"]),
+]
+
+
+@pytest.mark.parametrize(
+    "module_id,keywords",
+    MODULE_CONTENT_EXPECTATIONS,
+    ids=[f"module_{m}" for m, _ in MODULE_CONTENT_EXPECTATIONS],
+)
+def test_module_content(module_id, keywords):
+    """Verify each module produces at least one of its expected keywords."""
+    result = run_demo("--dry-run", "--no-pause", module_id)
+    assert result.returncode == 0, f"Module {module_id} failed with stderr: {result.stderr}"
+    stdout_lower = result.stdout.lower()
+    found = any(kw.lower() in stdout_lower for kw in keywords)
+    assert found, (
+        f"Module {module_id} should contain one of {keywords}, "
+        f"but none found in output"
+    )
+
+
+@pytest.mark.parametrize("module_id", [str(i) for i in range(79)])
 def test_individual_modules_dry(module_id):
     """Verify each individual module runs in dry-run mode."""
     result = run_demo("--dry-run", "--no-pause", module_id)

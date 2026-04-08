@@ -48,20 +48,30 @@ Run `make help` for all targets. Key shortcuts:
 
 | Target | Description |
 |--------|-------------|
+| `make build` | Build container images |
 | `make up` | Build and start the 6-node cluster |
 | `make down` | Stop the cluster (preserve data) |
+| `make restart` | Restart the cluster |
 | `make destroy` | Stop and delete all data volumes |
 | `make status` | Show nodetool status |
+| `make logs` | Tail cluster logs |
 | `make cqlsh` | Open CQL shell on node1 |
 | `make demo` | Run the interactive entropy demo |
 | `make demo-dry` | Dry-run demo (no cluster needed) |
-| `make demo-score` | Validate all 72 modules (scorecard) |
+| `make demo-full` | Build cluster + run full automated demo |
+| `make demo-score` | Validate all 79 modules (scorecard) |
+| `make demo-ransomware` | Run DORA ransomware demo (modules 72-78) |
+| `make minio` | Start MinIO WORM storage |
+| `make minio-down` | Stop MinIO |
 | `make api` | Start Data API (http://localhost:8181) |
 | `make api-down` | Stop Data API |
 | `make monitoring` | Start Prometheus + Grafana (http://localhost:3000) |
 | `make monitoring-down` | Stop Prometheus + Grafana |
 | `make test` | Run all pytest tests |
+| `make lint` | Lint scripts (shellcheck + ruff) |
+| `make validate` | Validate docker-compose.yml syntax |
 | `make wait` | Wait until all nodes are Up/Normal |
+| `make clean` | Remove dangling images and build cache |
 
 ## Connecting to the Cluster
 
@@ -135,7 +145,7 @@ You can automatically generate the topology for various cluster sizes and config
 
 2.  **Apply the changes**:
     ```bash
-    docker-compose up -d --build
+    docker compose up -d --build
     ```
 3.  **Verify status**:
     ```bash
@@ -158,6 +168,7 @@ The cluster can be configured via environment variables in the `.env` file or `d
 | `CASSANDRA_DC` | Datacenter name for this node | `dc1` |
 | `CASSANDRA_RACK` | Rack name for this node | `rack1` |
 | `MAX_HEAP_SIZE` | JVM heap size (`-Xmx` and `-Xms`) | `512M` |
+| `HEAP_NEWSIZE` | JVM young generation size (`-Xmn`) | `100M` |
 | `JVM_EXTRA_OPTS` | Additional JVM options (e.g., JMX exporter) | (empty) |
 
 ## Monitoring (Prometheus + Grafana)
@@ -170,7 +181,7 @@ make monitoring      # or: docker compose --profile monitoring up -d
 
 This launches:
 - **Prometheus** (`http://localhost:9090`) — scrapes JMX metrics from all 6 nodes via the JMX Prometheus exporter (port 9404)
-- **Grafana** (`http://localhost:3000`, login: admin/admin) — pre-provisioned dashboard with 8 panels:
+- **Grafana** (`http://localhost:3000`, default login: admin/admin, configurable via `GF_ADMIN_USER`/`GF_ADMIN_PASSWORD`) — pre-provisioned dashboard with 8 panels:
   - Write/Read p99 latency
   - MutationStage and ReadStage thread pool activity
   - Compaction pending tasks
@@ -188,7 +199,7 @@ Modules 38-40 of the demo automatically detect Grafana and display a link when i
 | **Disk** | 2 GB free | 5+ GB |
 | **Docker** | 20.10+ | Latest stable |
 
-The default heap is 512 MB per node. A 6-node cluster uses ~3 GB RAM for containers alone. With Prometheus + Grafana, add ~500 MB.
+The default heap is 512 MB per node within a 1024 MB container memory limit. A 6-node cluster uses ~6 GB RAM for containers alone. With Prometheus + Grafana, add ~500 MB.
 
 ## Scaling and Demo Notes
 
@@ -198,9 +209,16 @@ The default heap is 512 MB per node. A 6-node cluster uses ~3 GB RAM for contain
 - **Networking**: This setup uses static IPs within a dedicated Docker bridge network (`172.28.0.0/24`).
 - **Snitch**: Uses `GossipingPropertyFileSnitch` by default to support the multi-datacenter topology.
 
+## Security Considerations
+
+- **Port binding**: All exposed ports (CQL 9042, Grafana 3000, Prometheus 9090, Data API 8181, MinIO 9000/9001) are bound to `127.0.0.1` by default (localhost only). To expose externally, change `127.0.0.1:PORT:PORT` to `0.0.0.0:PORT:PORT` in `docker-compose.yml`.
+- **Container hardening**: All containers run with `cap_drop: ALL`, `no-new-privileges:true`, and minimal `cap_add: NET_ADMIN`. Resource limits (CPU and memory) are enforced.
+- **Credentials**: Grafana and MinIO credentials default to `admin/admin` and `minioadmin/minioadmin`. Override via environment variables (`GF_ADMIN_USER`, `GF_ADMIN_PASSWORD`, `MINIO_ROOT_USER`, `MINIO_ROOT_PASSWORD`) in your `.env` file.
+- **TLS**: Internode and client-to-node encryption can be enabled via `cassandra.yaml.template`. See demo module 41 for RBAC and TLS walkthrough.
+
 ## Troubleshooting
 
-- **Node fails to start**: Check the logs using `docker-compose logs -f`. Common issues include insufficient memory allocated to Docker (recommend 4GB+ for Docker).
+- **Node fails to start**: Check the logs using `docker compose logs -f`. Common issues include insufficient memory allocated to Docker (recommend 4GB+ for Docker).
 - **Nodes not joining**: Ensure the seed node (`hcd-node1` at `172.28.0.2`) is healthy and that `CASSANDRA_SEEDS` is correctly configured for the other nodes.
 - **Healthcheck fails**: The first startup can take a while. Increase `start_period` in `docker-compose.yml` if your hardware is slower.
 - **Demo module hangs**: If a module waits indefinitely for a node, press Ctrl+C. The cleanup trap will restart all nodes. Then re-run from the failed module: `./scripts/demo-entropy.sh <module_number>`.
@@ -210,6 +228,4 @@ The default heap is 512 MB per node. A 6-node cluster uses ~3 GB RAM for contain
 
 ## Review & Feedback
 
-**Grade:** A+ (97/100)
-
-*Review Summary:* 72-module interactive demo in 8 parts with enterprise strategic coverage including: HCD Data API (REST/JSON), multi-tenant isolation, node decommission, disaster recovery runbook, silent data corruption detection, cross-service saga (outbox pattern), LWT contention analysis, and repair deep-dive (Merkle trees, gc_grace). Plus: RAG pipeline, GDPR data sovereignty, RPO/RTO, Reaper scheduling, Kafka CDC, SOX/PCI-DSS compliance, chaos test, and evidence-based positioning. Every claim backed by live runnable code (72/72 scorecard, 109/109 tests).
+79-module interactive demo in 9 parts covering distributed systems, Cassandra internals, enterprise operations, and DORA ransomware resilience. All modules validated: 79/79 scorecard, 184/184 tests.

@@ -17,7 +17,7 @@ cleanup_on_error() {
         docker exec hcd-node1 nodetool status 2>/dev/null || echo "(node1 unreachable)"
     fi
 }
-trap cleanup_on_error EXIT
+trap cleanup_on_error INT TERM EXIT
 
 # 1. Pre-flight checks
 if [ ! -f "hcd-1.2.3-bin.tar.gz" ]; then
@@ -42,7 +42,7 @@ log_info "Starting HCD cluster..."
 ${COMPOSE} up -d --build
 
 # 3. Wait for Health
-EXPECTED_NODES=6
+EXPECTED_NODES=${EXPECTED_NODES:-6}
 log_info "Waiting for ${EXPECTED_NODES} nodes to initialize (this may take 2-3 minutes)..."
 MAX_RETRIES=30
 COUNT=0

@@ -1,13 +1,11 @@
 # HCD Entropy & Consistency Didactic Demo
-**Grade: A+ (97/100)**
-
-> **Executive Summary:** A 72-module interactive demo proving that IBM HCD delivers zero-downtime resilience, automatic self-healing, and tunable consistency across datacenters. Designed for live stakeholder presentations and hands-on engineering onboarding.
+> **Executive Summary:** A 79-module interactive demo proving that IBM HCD delivers zero-downtime resilience, automatic self-healing, and tunable consistency across datacenters — including a full DORA ransomware resilience scenario with WORM-protected backups. Designed for live stakeholder presentations and hands-on engineering onboarding.
 >
 > **Why this matters:** Unplanned database downtime costs enterprises $5,600-$9,000 per minute (Gartner). This demo proves — live, on your laptop — that HCD survives datacenter-level failures with zero data loss and zero application errors, eliminating the single largest source of availability risk in distributed data infrastructure.
 
 | | |
 |---|---|
-| **Modules** | 72 (0-71), organized in 8 parts |
+| **Modules** | 79 (0-78), organized in 9 parts |
 | **Cluster** | 6 nodes, 2 DCs, RF=3 per DC |
 | **Time (interactive)** | ~3-4 hours (full), ~20 min per part |
 | **Time (non-interactive)** | ~60-90 minutes |
@@ -31,7 +29,7 @@
     make demo                        # full interactive demo
     ./scripts/demo-entropy.sh 23     # jump to a specific module
     ./scripts/demo-entropy.sh --dry-run --no-pause  # dry-run, no cluster needed
-    ./scripts/demo-entropy.sh --score              # validate all 72 modules (scorecard)
+    ./scripts/demo-entropy.sh --score              # validate all 79 modules (scorecard)
     ```
     > **Single-module execution:** When jumping to Module N > 1, the script auto-creates the `rf_prod` keyspace via `ensure_rf_prod()` so prerequisites are satisfied.
 
@@ -167,7 +165,7 @@ This demo uses a 6-node, multi-DC cluster simulated in Docker.
 | 44 | Speculative Execution | Interactive Q + p99 drops to ~p50 with backup requests |
 | 45 | Live DC Failover with Driver (~3-5 min) | Zero errors during DC kill, RPO=0/RTO=1-3s |
 | 46 | Retry Policies Under Partition | pause+disconnect dual failure, 3 policies compared |
-| 47 | Demo Summary Dashboard | Visual recap of all 72 modules |
+| 47 | Demo Summary Dashboard | Visual recap of all 79 modules |
 
 #### Part 6 — Transactions & Patterns (Modules 48-53)
 | Module | Title | Key Proof |
@@ -205,6 +203,17 @@ This demo uses a 6-node, multi-DC cluster simulated in Docker.
 | 70 | Cross-DC Consistency Window | Network partition between DCs, LOCAL_QUORUM staleness, EACH_QUORUM trade-off |
 | 71 | Bloom Filter & Cache Tuning | bloom_filter_fp_chance, key cache hit ratio, row cache, chunk cache, FP trade-offs |
 
+#### Part 9 — DORA Ransomware Resilience (Modules 72-78)
+| Module | Title | Key Proof |
+|--------|-------|-----------|
+| 72 | DORA Ransomware — Kill Chain & Infrastructure Setup | Ransomware kill chain, DORA quiz, dora_bank keyspace, MinIO WORM bucket creation with Object Lock COMPLIANCE |
+| 73 | Backup to WORM & Integrity | nodetool snapshot on all nodes, upload to MinIO WORM, SHA-256 integrity verification, deletion attempt blocked by Object Lock |
+| 74 | Commitlog Archiving to WORM | commitlog_archiving.properties, WAL segment archiving, two-tier WORM (snapshots + commitlogs), PITR explanation |
+| 75 | The Attack Simulation | 5-phase ransomware: recon, exfil, TRUNCATE all tables, clearsnapshot --all, ransom note — WORM backups survive |
+| 76 | Recovery from WORM Backups | Integrity verification, SSTable restore from WORM, data verification (5 accounts, 4 transactions), DC2 consistency check |
+| 77 | DC Failover Under Attack | dc1 network partition (3 nodes disconnected), dc2 serves at LOCAL_QUORUM, writes during partition, repair reconvergence |
+| 78 | DORA Compliance Scorecard & K8s | DORA article mapping (Art. 6,9-13,19,26), Art. 19 incident reporting timeline, 5 recovery paths matrix, K8ssandra CRD + auto-healing |
+
 ## Cleanup
 
 To stop the cluster and remove data volumes:
@@ -216,17 +225,18 @@ make destroy     # or: docker compose down -v
 
 ## Module 0: Introduction & Cluster Status
 
-The opening module verifies the cluster is healthy, introduces the 6-node, 2-DC topology, and presents an 8-part roadmap of the entire demo.
+The opening module verifies the cluster is healthy, introduces the 6-node, 2-DC topology, and presents a 9-part roadmap of the entire demo.
 
-### 8-Part Roadmap
+### 9-Part Roadmap
 - **Part 1 — Foundations** (Modules 0-13): Replication, consistency levels, hinted handoff, read repair, anti-entropy repair
 - **Part 2 — Advanced Failures** (Modules 14-24): Ghost rack, zombie node, network partition, SAI, vector search, DC kill
 - **Part 3 — Operations** (Modules 25-37): CDC, audit logging, guardrails, data modeling, compaction, compression, backup/restore
-- **Part 4 — Performance** (Modules 38-42): Thread pools, repair strategies, stress testing, security, geographic visualization
+- **Part 4 — Performance** (Modules 38-42): Stress testing, rate limiting, thread pools
 - **Part 5 — Driver Policies** (Modules 43-47): Token-aware routing, speculative execution, DC failover, retry policies
 - **Part 6 — Transactions & Patterns** (Modules 48-53): ACID model, batches, LWT, saga patterns, decision framework
 - **Part 7 — Enterprise** (Modules 54-61): HCD Data API, multi-tenant isolation, node decommission, disaster recovery, silent data corruption, cross-service saga, LWT contention, repair deep-dive
 - **Part 8 — Operational Deep-Dives** (Modules 62-71): RBAC, encryption at rest, commitlog crash recovery, hint expiration, dynamic RF change, streaming, materialized views, nodetool ops, cross-DC consistency, bloom filter & cache tuning
+- **Part 9 — DORA Ransomware Resilience** (Modules 72-78): Kill chain, WORM backups (MinIO Object Lock), commitlog archiving, ransomware attack simulation, recovery from WORM, DC failover under attack, DORA compliance scorecard, K8ssandra auto-healing
 
 ### What You'll Learn
 - How to verify cluster health with `nodetool status`
@@ -290,7 +300,7 @@ The demo poses an interactive question before revealing the result: **"Will LOCA
 
 ### Scenario A: Single Node Failure
 ```bash
-docker-compose stop hcd-node3
+docker compose stop hcd-node3
 docker exec hcd-node1 nodetool status | grep "DN"
 # LOCAL_QUORUM still works: 2 of 3 replicas available
 ```
@@ -298,7 +308,7 @@ docker exec hcd-node1 nodetool status | grep "DN"
 ### Scenario B: Rack Failure
 ```bash
 # Stop Rack 1 in both DCs
-docker-compose stop hcd-node1 hcd-node4
+docker compose stop hcd-node1 hcd-node4
 ```
 
 ---
@@ -341,7 +351,7 @@ Client ──► Coordinator (node1)
 ```
 
 **Demo steps (guaranteed divergence):**
-1. Stop node3 (`docker-compose stop hcd-node3`)
+1. Stop node3 (`docker compose stop hcd-node3`)
 2. Write at CL=ONE while node3 is down — node3 misses the write
 3. Restart node3 — it has stale data
 4. Read at CL=ALL — coordinator detects digest mismatch
@@ -454,10 +464,10 @@ Interactive question: **"After a node restarts, how does it know what data it mi
 
 Demonstrates what happens when a downed node returns: pending hints are automatically replayed, synchronizing the node without a full repair.
 
-1. Stop node3: `docker-compose stop hcd-node3`
+1. Stop node3: `docker compose stop hcd-node3`
 2. Write data while node3 is down
-3. Restart node3: `docker-compose start hcd-node3`
-4. Watch hints replay in the logs: `docker-compose logs -f hcd-node3`
+3. Restart node3: `docker compose start hcd-node3`
+4. Watch hints replay in the logs: `docker compose logs -f hcd-node3`
 5. Verify data is consistent across all replicas
 
 **What to look for:** In the node3 logs, messages like "Finished hinted handoff" or "Replaying hints". Row count on node3 matches the other replicas after replay completes.
@@ -540,13 +550,13 @@ DC1                          DC2
 
 ```bash
 # Kill Rack 1 in both DCs
-docker-compose stop hcd-node1 hcd-node4
+docker compose stop hcd-node1 hcd-node4
 
 # Verify: LOCAL_QUORUM still succeeds (2 of 3 replicas per DC alive)
 docker exec hcd-node2 cqlsh -e "CONSISTENCY LOCAL_QUORUM; SELECT count(*) FROM rf_prod.health;"
 
 # Restore
-docker-compose start hcd-node1 hcd-node4
+docker compose start hcd-node1 hcd-node4
 ```
 
 **Why this works:** `NetworkTopologyStrategy` places one replica per rack. With 3 racks per DC, losing Rack 1 leaves 2 replicas alive — still enough for LOCAL_QUORUM (requires 2 of 3).
@@ -686,9 +696,9 @@ BEGIN BATCH
 APPLY BATCH;
 ```
 
-### Enterprise Patterns (Parts 9-13)
+### Module 19 — Enterprise Pattern Reference
 
-#### Part 9: UDT + Nested JSON (Document Modeling)
+#### Sub-section 9: UDT + Nested JSON (Document Modeling)
 ```sql
 -- User-Defined Types for nested structures
 CREATE TYPE rf_prod.address (street text, city text, state text, zip text, country text);
@@ -712,7 +722,7 @@ INSERT INTO rf_prod.orders JSON '{"order_id": "...",
 -- Key constraint: frozen<> means atomic replacement — no partial UDT updates
 ```
 
-#### Part 10: JSON Document Versioning (Audit Trail Pattern)
+#### Sub-section 10: JSON Document Versioning (Audit Trail Pattern)
 ```sql
 CREATE TABLE rf_prod.document_versions (
     doc_id uuid,
@@ -732,7 +742,7 @@ SELECT JSON version, author, metadata FROM rf_prod.document_versions WHERE doc_i
 -- Add TTL to old versions for automatic cleanup
 ```
 
-#### Part 11: Event Sourcing with JSON Payloads
+#### Sub-section 11: Event Sourcing with JSON Payloads
 ```sql
 CREATE TABLE rf_prod.event_store (
     aggregate_id uuid,
@@ -750,7 +760,7 @@ CREATE TABLE rf_prod.event_store (
 -- This is the CQRS pattern — see Module 25 (CDC) and Module 51 (banking)
 ```
 
-#### Part 12: Bulk JSON & Performance
+#### Sub-section 12: Bulk JSON & Performance
 ```
 INSERT method         Round-trips  Use when
 ──────────────────────────────────────────────────────────────
@@ -763,7 +773,7 @@ Rule: JSON parsing adds ~0.1ms vs 2-5ms total latency — negligible <10K writes
 UNLOGGED BATCH is safe ONLY for same-partition writes (see Module 49)
 ```
 
-#### Part 13: JSON + SAI Composable Queries
+#### Sub-section 13: JSON + SAI Composable Queries
 ```sql
 CREATE TABLE rf_prod.catalog (
     product_id uuid PRIMARY KEY,
@@ -915,7 +925,7 @@ CREATE TABLE rf_prod.dc_failover (id int PRIMARY KEY, msg text, written_from tex
 INSERT INTO rf_prod.dc_failover (id, msg, written_from) VALUES (1, 'row-1', 'dc1');
 -- ... (20 rows total)
 
--- Kill dc1: docker-compose stop hcd-node1 hcd-node2 hcd-node3
+-- Kill dc1: docker compose stop hcd-node1 hcd-node2 hcd-node3
 
 -- Read from dc2 (all data present)
 CONSISTENCY LOCAL_QUORUM; SELECT count(*) FROM rf_prod.dc_failover;
@@ -923,7 +933,7 @@ CONSISTENCY LOCAL_QUORUM; SELECT count(*) FROM rf_prod.dc_failover;
 -- Write from dc2 during outage
 INSERT INTO rf_prod.dc_failover (id, msg, written_from) VALUES (21, 'during-outage', 'dc2');
 
--- Restore dc1: docker-compose start hcd-node1 hcd-node2 hcd-node3
+-- Restore dc1: docker compose start hcd-node1 hcd-node2 hcd-node3
 -- dc1 sees all data including rows written during outage
 ```
 
@@ -1055,7 +1065,7 @@ BEGIN UNLOGGED BATCH
 APPLY BATCH;
 ```
 
-**What to look for:** The batch triggers a WARN log message if it exceeds 5KB or a failure if it exceeds 50KB. Check `docker-compose logs hcd-node1` for "Batch ... is too large" warnings.
+**What to look for:** The batch triggers a WARN log message if it exceeds 5KB or a failure if it exceeds 50KB. Check `docker compose logs hcd-node1` for "Batch ... is too large" warnings.
 
 ---
 
@@ -1282,21 +1292,21 @@ Demonstrates zero-downtime node-by-node restart of ALL nodes (including the seed
 
 ```bash
 # Restart node3 (non-seed), verify writes work
-docker-compose stop hcd-node3
+docker compose stop hcd-node3
 docker exec hcd-node1 cqlsh -e "CONSISTENCY LOCAL_QUORUM; INSERT INTO rf_prod.rolling_test ...;"
-docker-compose start hcd-node3
+docker compose start hcd-node3
 # Wait for UN...
 
 # Restart node2 (non-seed), verify writes work
-docker-compose stop hcd-node2
+docker compose stop hcd-node2
 docker exec hcd-node1 cqlsh -e "CONSISTENCY LOCAL_QUORUM; INSERT INTO rf_prod.rolling_test ...;"
-docker-compose start hcd-node2
+docker compose start hcd-node2
 # Wait for UN...
 
 # Restart node1 (SEED — last), verify writes work from node2
-docker-compose stop hcd-node1
+docker compose stop hcd-node1
 docker exec hcd-node2 cqlsh -e "CONSISTENCY LOCAL_QUORUM; INSERT INTO rf_prod.rolling_test ...;"
-docker-compose start hcd-node1
+docker compose start hcd-node1
 # Wait for UN...
 ```
 
@@ -1557,7 +1567,7 @@ DCAwareRoundRobinPolicy(
 ### What the Demo Shows
 
 1. Start continuous writer on hcd-node4 (dc2) with `local_dc='dc1'`
-2. Kill all dc1 nodes (`docker-compose stop hcd-node1 hcd-node2 hcd-node3`)
+2. Kill all dc1 nodes (`docker compose stop hcd-node1 hcd-node2 hcd-node3`)
 3. Driver automatically routes to dc2 — zero errors
 4. Restart dc1 — driver routes traffic back home
 
@@ -1626,7 +1636,7 @@ This ensures the driver encounters both timeout and unavailable exceptions, maki
 
 A visual recap of everything covered in the demo, presented as an ASCII dashboard showing:
 
-- **Total modules**: 72 (0-71)
+- **Total modules**: 79 (0-78)
 - **What was proved**: Zero data loss during node/DC failure, automatic self-healing, LWW conflict resolution, rolling restart with zero downtime, automatic driver DC failover, p99 latency masking, safe banking transfers, saga compensation
 - **Topics covered**: Core, Indexing (SAI), Write Path, Multi-DC, Ops, Security, Data Modeling, Driver Policies, Transactions (ACID, Batches, LWT, Sagas)
 - **Key production takeaways**: LOCAL_QUORUM, TokenAwarePolicy, used_hosts_per_remote_dc, weekly repair, partition key design, monitoring, PasswordAuthenticator
@@ -1723,6 +1733,150 @@ The capstone module presents four sections with pauses between each for discussi
 
 ---
 
+## Module 54: HCD Data API (REST/JSON Document Access)
+
+Demonstrates the HCD Data API running on `http://localhost:8181`, providing REST/JSON access to Cassandra data without CQL. Uses a Postman collection with CRUD operations: `insertOne`, `find`, `updateOne`, `deleteOne`. Shows document-style access patterns alongside traditional CQL, proving HCD supports both relational and document paradigms.
+
+**What to look for:** HTTP 200 responses for all CRUD operations. The Data API translates JSON documents to/from Cassandra tables transparently. Compare latency of REST vs native CQL.
+
+---
+
+## Module 55: Multi-Tenant Isolation
+
+Shows how to design multi-tenant applications on HCD using tenant ID as partition key prefix, RBAC roles per tenant, GDPR-compliant data erasure (DELETE WHERE tenant_id = X), and DC affinity for data sovereignty.
+
+**What to look for:** Each tenant's data is isolated at the partition level. RBAC prevents cross-tenant access. GDPR erasure removes all data for a single tenant without affecting others.
+
+---
+
+## Module 56: Node Decommission (Controlled Cluster Shrink)
+
+Walks through safe node removal: `nodetool drain` (stop accepting writes), `nodetool decommission` (stream data to remaining nodes), and verification. Compares `decommission` (graceful) vs `removenode` (node already dead) vs `assassinate` (force-remove from gossip).
+
+**What to look for:** Decommission streams all data off the node before it leaves the ring. `nodetool status` shows the node transitioning from UN to UL (Leaving) to gone.
+
+---
+
+## Module 57: Disaster Recovery Runbook
+
+Demonstrates a 4-level DR strategy: (1) `nodetool snapshot` for point-in-time backups, (2) coordinated multi-node snapshots, (3) `truncate` + restore from snapshot, (4) commitlog archival for RPO=0. References Medusa for production-grade automated backups to cloud storage.
+
+**What to look for:** Snapshot creates hard links (instant, zero-copy). Restore from snapshot + commitlog replay recovers to the exact pre-failure state.
+
+---
+
+## Module 58: Silent Data Corruption Detection
+
+Injects corruption into an SSTable's `Data.db` file using `dd` with random bytes, then detects it with `nodetool verify` (CRC32 scan) and `nodetool scrub` (row-level rebuild). Demonstrates recovery via `nodetool repair` from healthy replicas (majority wins with RF=3).
+
+**What to look for:** `nodetool verify` reports the corrupted SSTable path. After `scrub` + `repair`, all 10 test rows are restored from healthy replicas.
+
+---
+
+## Module 59: Cross-Service Saga (Simulated External Services)
+
+Extends the saga pattern from Modules 51-52 to cross-service transactions spanning Order, Payment, and Shipping services. Demonstrates happy path (5-step lifecycle), payment timeout with compensation, and post-capture shipping failure with refund. Uses the outbox pattern for reliable event delivery and LWT for idempotent step execution.
+
+**What to look for:** Three saga scenarios with different outcomes. Replaying a completed step returns `[applied]: False` (idempotency). All outbox events are generated atomically with state changes.
+
+---
+
+## Module 60: LWT Contention Under Load
+
+Launches 5 concurrent LWT writers targeting the same row to demonstrate Paxos contention. Compares single-writer baseline (zero retries) with concurrent contention (only 1 winner per round). Uses `TRACING ON` to show the 4-phase Paxos round-trip cost vs normal writes. Covers mitigation strategies: partition sharding, exponential backoff, application queuing.
+
+**What to look for:** Single-writer: all 10 updates succeed immediately. Concurrent: only 1 of 5 writers wins. LWT trace shows Prepare/Promise/Propose/Commit phases (4x round-trips vs 1 for normal writes).
+
+---
+
+## Module 61: Repair Deep-Dive (The Most Critical Ops Procedure)
+
+Goes beyond Module 39's repair basics: visualizes Merkle trees, demonstrates the zombie row problem (deleted data resurrected after gc_grace expiry), and compares 4 repair modes (full, primary-range, incremental, sub-range). Creates deliberate entropy by stopping a node during writes, then repairs it. Covers gc_grace_seconds interaction and Reaper scheduling for production.
+
+**What to look for:** Node3 shows fewer rows than Node1 after the outage. After repair, counts match. Repair history visible in `system_distributed.repair_history`.
+
+---
+
+## Module 62: Live RBAC Demo (Role-Based Access Control)
+
+Demonstrates HCD's authentication and authorization: PasswordAuthenticator, role creation (`CREATE ROLE`), granular permissions (`GRANT SELECT/MODIFY`), permission denial, and role inheritance. Shows the full privilege hierarchy from superuser to read-only analyst roles.
+
+**What to look for:** Each role has precisely scoped permissions. Unauthorized operations are denied with clear error messages. Role inheritance allows hierarchical access models.
+
+---
+
+## Module 63: Encryption at Rest (Transparent Data Encryption)
+
+Shows TDE configuration: JKS/JCEKS keystore setup, `AES/CBC/PKCS5Padding` cipher, encrypted SSTable verification via `hexdump` (random bytes vs plaintext), and key rotation workflow using `nodetool upgradesstables`.
+
+**What to look for:** Encrypted SSTables show random bytes in hexdump (no readable text). Key rotation re-encrypts all SSTables with the new key without downtime.
+
+---
+
+## Module 64: Commitlog Durability & Crash Recovery
+
+Uses `docker kill` (SIGKILL) to simulate an unclean process crash after writing data. Demonstrates that commitlog replay on restart recovers all committed writes with zero data loss. Compares `commitlog_sync: periodic` (default, 10s window) vs `batch` (fsync per write, slower but durable).
+
+**What to look for:** After SIGKILL + restart, all rows written before the crash are present. The commitlog replay message appears in startup logs.
+
+---
+
+## Module 65: Hint Expiration & Data Gaps
+
+Demonstrates the hinted handoff lifecycle: stops a node, writes data that generates hints on the coordinator, then shows hint delivery on restart. Explains `max_hint_window_in_ms` (3 hours default) — if a node is down longer, hints expire and data gaps require repair.
+
+**What to look for:** Hints are stored on the coordinator while the target is down. After restart, `nodetool handoffwindow` or system.hints shows hint delivery. For outages > 3 hours, repair is mandatory.
+
+---
+
+## Module 66: Dynamic RF Change (ALTER KEYSPACE)
+
+Changes replication factor from RF=1 to RF=3 via `ALTER KEYSPACE` and demonstrates that this is metadata-only — new replicas are empty until `nodetool repair` populates them. Shows that QUORUM reads fail on empty replicas until repair completes.
+
+**What to look for:** After ALTER KEYSPACE, `nodetool describering` shows new token assignments but new replicas have zero data. QUORUM reads may fail. After repair, all replicas have consistent data.
+
+---
+
+## Module 67: Streaming & Bootstrap Monitoring
+
+Walks through the bootstrap lifecycle when a new node joins: token allocation, streaming from existing nodes, and monitoring via `nodetool netstats`. Covers `stream_throughput_outbound_megabits_per_sec` (200 Mbps default) for rate limiting.
+
+**What to look for:** `nodetool netstats` shows active streams with progress percentages. Stream throughput can be adjusted to avoid saturating the network during bootstrap.
+
+---
+
+## Module 68: Materialized Views (Write-Through Consistency)
+
+Creates a base table and materialized view, demonstrating write-through semantics (MV updates automatically on base table writes). Shows the 2x+ write amplification cost, consistency risks (MV can silently diverge from base), and the production caveat that the only fix for a diverged MV is `DROP` + `CREATE`.
+
+**What to look for:** MV rows appear automatically after base table inserts. Write amplification is visible in `nodetool tablestats` (MV receives same write volume as base table).
+
+---
+
+## Module 69: Nodetool Ops Deep-Dive (Troubleshooting Toolkit)
+
+Covers the essential nodetool commands for production troubleshooting: `tablestats` (per-table metrics), `tpstats` (thread pool activity), `proxyhistograms` (coordinator-level latency distribution), and `compactionstats` (pending compactions). Presents a troubleshooting decision tree for common production issues.
+
+**What to look for:** Each command reveals different operational metrics. The decision tree maps symptoms (high latency, dropped messages, pending compactions) to diagnostic commands and remediation steps.
+
+---
+
+## Module 70: Cross-DC Consistency Window
+
+Uses `docker network disconnect` to partition dc2 from dc1, then demonstrates that LOCAL_QUORUM reads in dc1 succeed but return stale data when dc2 has newer writes. Shows EACH_QUORUM as the cross-DC consistency guarantee (at the cost of higher latency and reduced availability).
+
+**What to look for:** During partition, LOCAL_QUORUM in dc1 succeeds but may miss dc2 writes. EACH_QUORUM fails during partition (by design — it requires both DCs). After reconnection, data converges.
+
+---
+
+## Module 71: Bloom Filter & Cache Tuning
+
+Creates tables with different `bloom_filter_fp_chance` settings (0.001, 0.01, 0.1) and compares memory usage via `nodetool tablestats`. Explains the trade-off: lower FP chance = larger bloom filters in memory = fewer wasted disk reads. Covers key cache, row cache, and chunk cache hit ratios.
+
+**What to look for:** Tables with lower `bloom_filter_fp_chance` show larger bloom filter sizes in `tablestats`. The FP trade-off table shows ~15 bits/key at 0.001 vs ~10 bits/key at 0.01 (default).
+
+---
+
 ## Appendix A: Wow Moments for Stakeholder Demos
 
 The highest-impact modules for executive presentations, ordered by audience reaction:
@@ -1765,3 +1919,77 @@ Before each wow moment, anchor the demonstration with the audience's own cost of
 | Audit log empty after enableauditlog | Need CQL after enabling | Run queries AFTER `nodetool enableauditlog` |
 | Guardrail warnings not appearing | Batch too small to trigger | Increase batch to > 5KB (50+ rows with data) |
 | Single-module fails on missing keyspace | Prerequisites not met | Script auto-creates `rf_prod` for Module > 1; verify cluster is running |
+| MinIO Object Lock error | MinIO started without `--with-lock` | `docker rm -f minio` and let demo-entropy.sh re-create it |
+| WORM deletion succeeds (should fail) | Bucket created without Object Lock | Re-create bucket: `mc mb --with-lock myminio/hcd-snapshots` |
+
+---
+
+## Module 72: DORA Ransomware — Kill Chain & Infrastructure Setup
+
+Introduces the DORA (EU Regulation 2022/2554) ransomware resilience demo. Presents the ransomware kill chain (7 phases) and defense layers (6 tiers). Interactive DORA quiz (5 questions). Creates `dora_bank` keyspace (RF=3 per DC) with `accounts`, `transactions`, and `audit_log` tables. Inserts 5 sample banking accounts. Starts MinIO with Object Lock support and creates two WORM-enabled buckets (`hcd-snapshots`, `hcd-commitlogs`) with 30-day COMPLIANCE retention.
+
+**What to look for:** The kill chain diagram shows how ransomware escalates from Initial Access to Impact. The DORA quiz calibrates your regulatory knowledge. MinIO bucket creation should show `Object Lock: Enabled`.
+
+**Takeaway:** DORA Art. 6 mandates ICT risk management frameworks; Art. 12 mandates backup separation. WORM storage with Object Lock in COMPLIANCE mode satisfies Art. 12 — even root cannot delete before retention expires.
+
+**Key concepts:** DORA Art. 6 (risk framework), Art. 12 (backup policies), WORM storage, Object Lock COMPLIANCE mode, MinIO S3-compatible storage.
+
+## Module 73: Backup to WORM & Integrity Verification
+
+Takes `nodetool snapshot` on all 6 nodes, uploads snapshot SSTables to MinIO WORM bucket with SHA-256 checksums. Verifies integrity by downloading and comparing checksums. Attempts to delete from WORM bucket — Object Lock blocks the deletion, proving immutability. Demonstrates that even the MinIO root admin cannot bypass COMPLIANCE retention.
+
+**What to look for:** The `mc rm` command should fail with an Object Lock error. The `mc stat` command should still show the object after the deletion attempt. SHA-256 checksums should match between source and WORM copy.
+
+**Takeaway:** WORM backups with integrity verification satisfy DORA Art. 12's backup testing requirement. The key insight: COMPLIANCE mode Object Lock is truly immutable — no override exists, unlike GOVERNANCE mode.
+
+**Key concepts:** nodetool snapshot (instant hard-links), SHA-256 integrity verification, Object Lock COMPLIANCE (no override), DORA Art. 12 backup testing requirement.
+
+## Module 74: Commitlog Archiving to WORM
+
+Explains the gap between snapshots: commitlog archiving captures every mutation written after the last snapshot. Configures `commitlog_archiving.properties` on node1. Generates transaction data, flushes commitlogs, and archives segments to MinIO WORM. Verifies Object Lock protects commitlog archives. Two-tier WORM: snapshots (bulk recovery) + commitlogs (incremental PITR).
+
+**What to look for:** The commitlog segments should appear in MinIO after flush. Object Lock should protect them just like SSTable snapshots. The RPO drops from "time since last snapshot" to "time since last commitlog flush" (~10 seconds).
+
+**Takeaway:** Two-tier WORM (snapshots + commitlogs) provides defense in depth: snapshots for bulk recovery, commitlogs for point-in-time recovery. RPO approaches zero with continuous commitlog archiving.
+
+**Key concepts:** Write-ahead log (WAL), commitlog segments (32MB default), Point-in-Time Recovery (PITR), `archive_command`/`restore_command`, RPO calculation.
+
+## Module 75: The Attack Simulation
+
+Simulates a full ransomware attack in 5 phases: (1) Reconnaissance — enumerate cluster topology and schema, (2) Exfiltration — read and count all data, (3) Destruction — TRUNCATE all 3 tables across all replicas, (4) Snapshot wipe — `clearsnapshot --all` on all 6 nodes, (5) Ransom note — plant message in database. Verifies total data loss (count=0 on all tables, no local snapshots). Then proves WORM backups in MinIO are untouched — Object Lock survived the attack.
+
+**What to look for:** After TRUNCATE, all tables show count=0 across both DCs — multi-DC replication does NOT protect against TRUNCATE. After clearsnapshot, `nodetool listsnapshots` returns empty. But `mc ls` against MinIO still shows all backup files intact.
+
+**Takeaway:** TRUNCATE is a cluster-wide coordinated operation — it propagates to ALL replicas in ALL DCs. Local snapshots are also vulnerable to `clearsnapshot`. WORM storage is the only line of defense that survives a full ransomware attack.
+
+**Key concepts:** TRUNCATE is cluster-wide (multi-DC does NOT protect), clearsnapshot wipes local backups, WORM is the ONLY defense, DORA Art. 12 separation requirement.
+
+## Module 76: Recovery from WORM Backups
+
+Full recovery procedure: (1) Verify WORM backup integrity (checksums), (2) Download snapshots from MinIO, (3) Restore SSTables (simulates sstableloader), (4) Verify all 5 accounts and 4 transactions recovered, (5) Verify DC2 has consistent data. Drops the ransom note table. Shows recovery timeline aligned with DORA Art. 11 requirements (target RTO < 2 hours).
+
+**What to look for:** SHA-256 checksums match before and after download. All 5 accounts and 4 transactions reappear after restore. DC2 shows the same data as DC1 (cross-DC consistency). The ransom note table is dropped as part of cleanup.
+
+**Takeaway:** Recovery from WORM backups restores full data integrity. The procedure is repeatable and verifiable — critical for DORA Art. 11(6) which requires documented RTO/RPO objectives. Target: RTO < 2 hours for critical banking systems.
+
+**Key concepts:** sstableloader, backup integrity verification, RTO/RPO measurement, cross-DC consistency after restore, DORA Art. 11(6) recovery requirements.
+
+## Module 77: DC Failover Under Attack
+
+Simulates a datacenter-level attack: disconnects all 3 dc1 nodes from the network. Verifies dc2 continues serving reads and writes at LOCAL_QUORUM. Writes new data during the partition. Reconnects dc1 nodes and runs `nodetool repair` to sync missed mutations. Verifies both DCs converge to identical data, including data written during the partition.
+
+**What to look for:** After dc1 disconnection, dc2 queries at LOCAL_QUORUM succeed immediately — zero downtime. New writes during the partition are captured by dc2. After reconnection, `nodetool repair` syncs the data. Both DCs show identical results.
+
+**Takeaway:** LOCAL_QUORUM (not QUORUM) is essential for DC independence — QUORUM requires cross-DC acknowledgment and would fail during a partition. DC failover RTO is under 1 minute. Repair after reconnection ensures full convergence. Note: hints expire after `max_hint_window` (default 3h); for longer partitions, repair is mandatory.
+
+**Key concepts:** Network partition, LOCAL_QUORUM (not QUORUM) for DC independence, hinted handoff + repair for reconvergence, RTO < 1 minute for DC failover, DORA Art. 11 business continuity.
+
+## Module 78: DORA Compliance Scorecard & K8s Auto-Healing
+
+Maps all demo modules to specific DORA articles (Art. 6, 9, 10, 11, 12, 13, 19, 26). Presents Art. 19 incident reporting timeline (4h initial, 72h intermediate, 1 month final) with ransomware-specific examples. Shows 5 recovery paths with RTO/RPO matrix. Introduces K8ssandra CRD for Kubernetes auto-healing: pod killed → auto-recreated in ~5 minutes with zero manual action. Covers Medusa (backup), Reaper (repair), cass-operator (auto-healing), and Data API (REST gateway). Cleanup: drops `dora_bank` keyspace; MinIO container intentionally left running (stop with `docker rm -f minio`).
+
+**What to look for:** The DORA compliance matrix maps each defense (RBAC, TLS, WORM, repair, DC failover) to specific articles. The recovery path matrix shows 5 options with increasing RTO/RPO trade-offs. K8ssandra auto-healing demonstrates Art. 13 (learning/evolving) — the system self-corrects without human intervention.
+
+**Takeaway:** DORA compliance is not a checkbox — it requires demonstrated, tested resilience. This demo provides live proof for Art. 6 (risk framework), Art. 9 (protection), Art. 10 (detection), Art. 11 (business continuity), Art. 12 (backup), Art. 13 (learning), Art. 19 (reporting), and Art. 26 (TLPT). K8ssandra automates ongoing compliance.
+
+**Key concepts:** DORA compliance matrix, incident reporting (Art. 19), recovery path selection, K8ssandra operator, Medusa automated backups, Reaper repair scheduling.

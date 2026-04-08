@@ -1,6 +1,4 @@
 import subprocess
-import os
-import tempfile
 import shutil
 import yaml
 import pytest
@@ -115,3 +113,22 @@ def test_backup_created_on_overwrite(topology_workdir):
     backup_file = topology_workdir / "docker-compose.yml.bak"
     assert backup_file.exists()
     assert backup_file.read_text() == "original content"
+
+
+def test_backup_restored_on_error(topology_workdir):
+    """Verify docker-compose.yml is restored from backup when generation fails."""
+    compose_file = topology_workdir / "docker-compose.yml"
+    compose_file.write_text("original content")
+
+    # Use --subnet with non-/24 prefix to trigger a ValueError
+    result = subprocess.run(
+        ["python3", "scripts/generate-topology.py", "--nodes", "3", "--subnet", "10.0.0.0/16"],
+        capture_output=True,
+        text=True,
+        cwd=str(topology_workdir),
+    )
+    assert result.returncode != 0
+
+    # Original file should be restored
+    assert compose_file.exists()
+    assert compose_file.read_text() == "original content"

@@ -15,7 +15,7 @@
 | **Core Design** | | |
 | 1 | [Executive Summary](#1-executive-summary) | Problem statement, HCD advantage, document scope |
 | 2 | [Threat Landscape](#2-threat-landscape-how-ransomware-attacks-databases) | Kill chain, 5 attack vectors, real-world incidents |
-| 3 | [DORA Compliance Requirements](#3-dora-compliance-requirements) | Articles 9-13 mapped to database resilience |
+| 3 | [DORA Compliance Requirements](#3-dora-compliance-requirements) | Articles 6, 9-13 mapped to database resilience |
 | 4 | [HCD Defense-in-Depth](#4-hcd-architecture-defense-in-depth-against-ransomware) | 7 defense layers, structural comparison vs RDBMS |
 | **Scenarios** | | |
 | 5 | [Ransomware Scenarios S1-S5](#5-ransomware-scenarios-s1-s5--hcd-response) | Encryptor, Insider, Backup Killer, Silent Infiltrator, DC Destroyer |
@@ -25,7 +25,7 @@
 | 7 | [Detection Pipeline](#7-detection-pipeline-architecture) | CDC, audit, 8 anomaly rules, SIEM integration |
 | 8 | [Recovery Decision Tree](#8-recovery-decision-tree) | 5-path decision logic for incident response |
 | 9 | [Incident Reporting Timeline](#9-dora-incident-reporting-timeline) | 4h → 72h → 1mo reporting with HCD evidence |
-| 16 | [DORA Scorecard](#16-dora-compliance-scorecard) | Extended 20/20 compliance checklist |
+| 16 | [DORA Scorecard](#16-dora-compliance-scorecard) | Extended 21/21 compliance checklist |
 | **Deep Dives** | | |
 | 11 | [Commitlog Archiving (WORM)](#11-commitlog-archiving-to-immutable-storage-worm) | Segment lifecycle, 3 patterns, S3 Object Lock, recovery flow |
 | 12 | [Backup Preservation](#12-backup-preservation-strategy) | Medusa, 3-2-1-1-0 rule, CDC-augmented restore, GFS retention |
@@ -73,7 +73,7 @@ This document designs a **7-scenario** live demo proving HCD's ransomware resili
 | # | Attack Vector | Traditional RDBMS Impact | HCD Impact |
 |---|---------------|--------------------------|------------|
 | A1 | **OS-level encryption** of data files | Total data loss (single master, mutable files) | 1 of 6 nodes affected; 5 healthy replicas remain |
-| A2 | **Credential compromise** → DROP/TRUNCATE | Immediate data destruction (UPDATE-in-place) | Tombstone-based delete; recoverable within gc_grace (10 days) |
+| A2 | **Credential compromise** → DROP/TRUNCATE | Immediate data destruction (UPDATE-in-place) | TRUNCATE uses timestamp-based erasure (not tombstones); auto-snapshot taken before TRUNCATE; recoverable from snapshot or WORM backup |
 | A3 | **Backup destruction** (96% of attacks) | No recovery possible | Distributed snapshots on 6 independent nodes; CDC stream to Kafka |
 | A4 | **Silent corruption** (logic bomb, weeks-long) | Corrupts backup chain; undetectable | CRC32 per SSTable chunk; CDC audit trail; Merkle tree divergence detection |
 | A5 | **Network partition** / DC isolation | Primary unreachable = no writes | LOCAL_QUORUM continues in surviving DC; zero downtime |
@@ -125,11 +125,16 @@ DORA (Regulation 2022/2554) applies to all EU financial entities since **17 Janu
 
 ### 3.1 DORA Articles Mapped to Database Resilience
 
-> **Note:** The PROTECT/DETECT/RESPOND/RECOVER/LEARN mapping below is the author's interpretive framework inspired by NIST CSF, not DORA's own taxonomy. DORA article sub-paragraph references (e.g., Art. 9(2)) are indicative mappings to the closest relevant requirement; the actual regulatory text should be consulted for compliance purposes. Incident reporting timelines (4h/72h/1mo) are defined in the implementing technical standards under Art. 20, not directly in Art. 19. Post-incident learning and root cause analysis are primarily covered by Art. 17 (ICT-related incident management), not Art. 13 (communication policies). TLPT requirements are in Art. 26.
+> **Note:** The PROTECT/DETECT/RESPOND/RECOVER/LEARN mapping below is the author's interpretive framework inspired by NIST CSF, not DORA's own taxonomy. DORA article sub-paragraph references (e.g., Art. 9(2)) are indicative mappings to the closest relevant requirement; the actual regulatory text should be consulted for compliance purposes. Incident reporting timelines (4h/72h/1mo) are defined in the implementing technical standards under Art. 20, not directly in Art. 19. Post-incident learning and root cause analysis are covered by Art. 13 (Learning and evolving) and Art. 17 (ICT-related incident management). Communication policies are Art. 14. TLPT requirements are in Art. 26.
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────┐
 │                     DORA COMPLIANCE FRAMEWORK                            │
+│                                                                          │
+│  ┌────────────────────────────────────────────────────────────────┐      │
+│  │  Art. 6  ICT RISK MANAGEMENT FRAMEWORK                        │      │
+│  │  Kill chain analysis, defense-in-depth, risk assessment       │      │
+│  └────────────────────────────────────────────────────────────────┘      │
 │                                                                          │
 │  ┌────────────┐  ┌────────────┐  ┌────────────┐  ┌────────────┐        │
 │  │  Art. 9    │  │  Art. 10   │  │  Art. 11   │  │  Art. 12   │        │
@@ -144,7 +149,7 @@ DORA (Regulation 2022/2554) applies to all EU financial entities since **17 Janu
 │  └────────────┘  └────────────┘  └────────────┘  └────────────┘        │
 │                                                                          │
 │  ┌────────────┐                                                          │
-│  │  Art. 13   │  TLPT (Threat-Led Penetration Testing) every 3 years    │
+│  │  Art. 13   │  Learning and evolving (post-incident improvement)      │
 │  │  LEARN     │  Art. 19: incident reporting (4h → 72h → 1mo)          │
 │  │            │                                                          │
 │  │ • Forensics│  Penalties: national authorities (Art. 50);             │
@@ -159,20 +164,21 @@ DORA (Regulation 2022/2554) applies to all EU financial entities since **17 Janu
 
 | DORA Article | Requirement | HCD Capability | Demo Module |
 |---|---|---|---|
-| **Art. 9(1)** | Protection of ICT systems | TDE (AES-256), TLS internode+client, RBAC | Scenarios 1, 2 |
-| **Art. 9(2)** | Least privilege access | Role hierarchy, per-table GRANT/REVOKE | Scenario 2 |
-| **Art. 9(3)** | Network segmentation | Multi-DC isolation, Docker network per DC | Scenario 5 |
-| **Art. 9(4)** | Data-at-rest encryption | TDE with JKS keystore, key rotation | Scenario 1 |
-| **Art. 10(1)** | Anomaly detection | CDC mutation stream → SIEM, audit logging | Scenario 4 |
-| **Art. 10(2)** | Continuous monitoring | Grafana dashboards, nodetool metrics | Scenario 4 |
-| **Art. 11(1)** | ICT business continuity | Multi-DC active-active, LOCAL_QUORUM | Scenario 5 |
-| **Art. 11(2)** | Backup policy (segregated, immutable) | Per-node snapshots (hard links to immutable SSTables) | Scenario 3 |
-| **Art. 11(3)** | Regular backup testing | Snapshot → truncate → restore → validate | Scenario 3 |
-| **Art. 11(6)** | Define maximum recovery time objectives | Snapshot restore: minutes; DC failover: seconds | Scenario 5 |
-| **Art. 12(1)** | Recovery procedures & RPO | RPO ≈ 0 (RF=3 local + async cross-DC); RTO < 5 min (snapshot) | Scenario 3 |
-| **Art. 12(2)** | Recovery testing at least annually | Automated scorecard (--score mode) | All scenarios |
-| **Art. 13(1)** | Post-incident root cause analysis | CDC forensic trail, audit logs, WRITETIME() | Scenario 4 |
-| **Art. 13(2)** | Communication to stakeholders | Automated incident timeline from CDC events | Scenario 4 |
+| **Art. 6** | ICT risk management framework | Risk assessment, defense-in-depth architecture, kill chain analysis | Module 72 |
+| **Art. 9(1)** | Protection of ICT systems | TDE (AES-256), TLS internode+client, RBAC | Modules 62-63 |
+| **Art. 9(2)** | Least privilege access | Role hierarchy, per-table GRANT/REVOKE | Module 62 |
+| **Art. 9(3)** | Network segmentation | Multi-DC isolation, Docker network per DC | Module 77 |
+| **Art. 9(4)** | Data-at-rest encryption | TDE with JKS keystore, key rotation | Module 63 |
+| **Art. 10(1)** | Anomaly detection | CDC mutation stream → SIEM, audit logging | Module 25 |
+| **Art. 10(2)** | Continuous monitoring | Grafana dashboards, nodetool metrics | Modules 38-40 |
+| **Art. 11(1)** | ICT business continuity | Multi-DC active-active, LOCAL_QUORUM | Module 77 |
+| **Art. 11(2)** | Backup policy (segregated, immutable) | Per-node snapshots + MinIO WORM (Object Lock) | Module 73 |
+| **Art. 11(3)** | Regular backup testing | Snapshot → TRUNCATE → restore from WORM → validate | Module 76 |
+| **Art. 11(6)** | Define maximum recovery time objectives | Snapshot restore: minutes; DC failover: seconds | Module 78 |
+| **Art. 12(1)** | Recovery procedures & RPO | RPO ≈ 0 (RF=3 local + WORM commitlog archive); RTO < 2h | Module 76 |
+| **Art. 12(2)** | Recovery testing at least annually | Automated scorecard (--score mode) | All modules |
+| **Art. 13(1)** | Learning from ICT incidents | Post-incident analysis, forensic trail, audit logs | Module 78 |
+| **Art. 13(2)** | Evolving ICT risk framework | Lessons incorporated into risk management, IaC audit trail | Module 78 |
 
 ---
 
@@ -275,7 +281,7 @@ DORA (Regulation 2022/2554) applies to all EU financial entities since **17 Janu
 │ Snapshot cost         │ Copy-on-write (slow)     │ Hard link (instant)      │
 │ Corruption detection  │ Manual / periodic        │ CRC32 per SSTable chunk  │
 │ Recovery from 1 node  │ Full restore required    │ Repair from 5 replicas   │
-│ DC failover           │ Manual / scripted        │ Automatic (driver-level) │
+│ DC failover           │ Manual / scripted        │ DNS/LB health checks     │
 │ Compromise blast radius│ Total (single master)   │ 1 of 6 nodes (16%)      │
 │ Time to recover       │ Hours (restore + replay) │ Minutes (snapshot/repair)│
 │ RTO (Tier-1 banking)  │ Difficult (>2h typical)  │ Native (<5min typical)   │
@@ -656,6 +662,8 @@ DORA (Regulation 2022/2554) applies to all EU financial entities since **17 Janu
 │                                                                                  │
 │  DORA Article        │ S1  │ S2  │ S3  │ S4  │ S5  │ S6  │ S7  │ Evidence      │
 │  ────────────────────┼─────┼─────┼─────┼─────┼─────┼─────┼─────┼─────────────  │
+│  Art.6  RISK MGMT    │  ●  │  ●  │  ●  │  ●  │  ●  │  ●  │  ●  │ Kill chain,   │
+│                      │     │     │     │     │     │     │     │ risk framework │
 │  Art.9  PROTECT      │  ●  │  ●  │     │     │  ●  │  ●  │  ●  │ TDE,RBAC,TLS, │
 │                      │     │     │     │     │     │     │     │ WORM,K8s PSS   │
 │  Art.10 DETECT       │  ●  │  ●  │     │  ●  │     │     │  ●  │ CDC,audit,     │
@@ -762,12 +770,12 @@ DORA (Regulation 2022/2554) applies to all EU financial entities since **17 Janu
 │                   ▼           ▼         ▼                                │
 │  ┌─────────────────┐ ┌──────────────┐ ┌───────────────────┐            │
 │  │ PATH 2:         │ │ PATH 3:      │ │ PATH 4 or 5:      │            │
-│  │ STREAM REBUILD  │ │ SNAPSHOT     │ │ FULL REBUILD       │            │
+│  │ STREAM REBUILD  │ │ SNAPSHOT     │ │ WORM / PITR        │            │
 │  │ RTO=15-75min    │ │ RESTORE      │ │                    │            │
-│  │ RPO=0           │ │ RTO=5-30min  │ │ Medusa available?  │            │
+│  │ RPO=0           │ │ RTO=5-30min  │ │ WORM backup avail? │            │
 │  │                 │ │ RPO=snap int.│ │ YES → PATH 4       │            │
-│  │ 1. Wipe node   │ │              │ │   Medusa restore    │            │
-│  │ 2. Rejoin      │ │ 1. Stop node │ │   RTO=85-115min     │            │
+│  │ 1. Wipe node   │ │              │ │   WORM restore      │            │
+│  │ 2. Rejoin      │ │ 1. Stop node │ │   RTO=30-60min      │            │
 │  │ 3. nodetool    │ │ 2. Copy snap │ │ NO → PATH 5         │            │
 │  │    rebuild     │ │ 3. Restart   │ │   Commitlog replay  │            │
 │  │ 4. Repair      │ │ 4. Repair    │ │   RTO=30-90min      │            │
@@ -841,15 +849,17 @@ DORA (Regulation 2022/2554) applies to all EU financial entities since **17 Janu
 
 The ransomware resilience demo should be implemented as **Part 9** of the existing demo, adding **7 new modules (72-78)** that build on existing capabilities and tie them to DORA compliance.
 
-| Module | Title | Scenario | Duration | Key Proof |
+| Module | Title | Coverage | Duration | Key Proof |
 |--------|-------|----------|----------|-----------|
-| 72 | **DORA Framework & Threat Landscape** | Intro | 5 min | Attack vectors, DORA articles, HCD defense layers |
-| 73 | **Scenario: The Encryptor (Node Compromise)** | S1 | 8 min | Stop node, verify zero downtime, rebuild, verify RPO=0 |
-| 74 | **Scenario: The Insider (Credential Compromise)** | S2+S4 | 10 min | RBAC limits, guardrails block DROP, tombstone recovery, CDC forensic trail (S4 detection woven in) |
-| 75 | **Scenario: Backup Resilience & Snapshot Recovery** | S3 | 8 min | Distributed snapshots, TRUNCATE, restore, verify zero loss |
-| 76 | **Scenario: DC Destruction & Automatic Failover** | S5 | 8 min | Network-partition DC1, DC2 continues, reconnect, convergence |
-| 77 | **Scenario: The Time Bomb (WORM Recovery)** | S6 | 8 min | Commitlog archiving, delete all data/snapshots, restore from WORM archive |
-| 78 | **Scenario: K8s Auto-Healing (Conceptual)** | S7 | 5 min | K8ssandra CRD walkthrough, auto-healing timeline, GitOps PR |
+| 72 | **DORA Ransomware — Kill Chain & Infrastructure Setup** | Intro, S1-S7 overview | 10 min | Kill chain (7 phases), DORA quiz (5 questions), dora_bank keyspace, MinIO WORM setup |
+| 73 | **Backup to WORM & Integrity Verification** | S3 (Backup Killer) defense | 8 min | Snapshot all 6 nodes, upload to MinIO Object Lock, SHA-256 checksums, WORM delete test |
+| 74 | **Commitlog Archiving to WORM** | S6 (Time Bomb) defense | 8 min | commitlog_archiving.properties, WAL segment archiving, two-tier WORM (snapshots + commitlogs) |
+| 75 | **The Attack Simulation** | S1+S3 combined attack | 10 min | 5-phase ransomware: recon, exfil, TRUNCATE all tables, clearsnapshot --all, ransom note |
+| 76 | **Recovery from WORM Backups** | S3+S6 recovery | 8 min | Integrity verify, restore from WORM, 5 accounts + 4 transactions recovered, DC2 consistency |
+| 77 | **DC Failover Under Attack** | S5 (DC Destroyer) | 8 min | Network-partition DC1, DC2 serves at LOCAL_QUORUM, write during partition, repair convergence |
+| 78 | **DORA Compliance Scorecard & K8s Auto-Healing** | All articles, S7 | 5 min | DORA article matrix, Art. 19 reporting timeline, 5 recovery paths, K8ssandra CRD |
+
+> **Implementation note:** The demo consolidates the 7 design scenarios (S1-S7) into a streamlined 7-module narrative. Scenarios S2 (Insider/RBAC) and S4 (Silent Infiltrator/CDC forensics) are partially addressed by existing modules 25-27 (CDC, audit logging, guardrails) and module 62 (live RBAC demo). The ransomware modules focus on the WORM backup/restore lifecycle and DC failover that are unique to Part 9.
 
 ### 10.2 Module Dependencies
 
@@ -870,14 +880,14 @@ The ransomware resilience demo should be implemented as **Part 9** of the existi
 │  New modules (Part 9: DORA Ransomware Resilience):                      │
 │  ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐               │
 │  │ Mod 72 │─│ Mod 73 │─│ Mod 74 │─│ Mod 75 │─│ Mod 76 │               │
-│  │  DORA  │ │Encrypt │ │Insider │ │Backup  │ │  DC    │               │
-│  │ Intro  │ │ Attack │ │ Attack │ │  Kill  │ │Destroy │               │
+│  │  Kill  │ │Snapshot│ │Commit- │ │ Attack │ │Recovery│               │
+│  │ Chain  │ │  WORM  │ │  log   │ │  Sim   │ │  WORM  │               │
 │  └────────┘ └────────┘ └────────┘ └────────┘ └───┬────┘               │
 │                                                    │                    │
 │  ┌────────┐ ┌────────┐                             │                    │
 │  │ Mod 77 │─│ Mod 78 │────────────────────────────┘                    │
-│  │  Time  │ │  K8s   │                                                  │
-│  │  Bomb  │ │AutoHeal│                                                  │
+│  │  DC    │ │  DORA  │                                                  │
+│  │Failovr│ │Scorecrd│                                                  │
 │  └────────┘ └────────┘                                                  │
 │                                                                          │
 │  Each new module references the existing module that provides            │
@@ -888,7 +898,7 @@ The ransomware resilience demo should be implemented as **Part 9** of the existi
 
 ### 10.3 DORA Compliance Scorecard
 
-See [Section 16](#16-dora-compliance-scorecard) for the full 20/20 extended scorecard covering all 7 scenarios and deep-dive sections.
+See [Section 16](#16-dora-compliance-scorecard) for the full 21/21 extended scorecard covering all 7 scenarios and deep-dive sections.
 
 ---
 
@@ -930,7 +940,7 @@ The commitlog is HCD's **write-ahead log** — every mutation is written here *b
 ### 11.2 Configuration: `commitlog_archiving.properties`
 
 ```properties
-# /etc/cassandra/commitlog_archiving.properties
+# /opt/hcd/resources/cassandra/conf/commitlog_archiving.properties
 # Archive command: invoked for each segment that becomes archivable
 archive_command=/opt/hcd/scripts/archive-commitlog.sh %path %name
 
@@ -1064,32 +1074,32 @@ HCD inverts this model: **every node is its own backup** via local snapshots, an
 ┌──────────────────────────────────────────────────────────────────────────┐
 │                    MEDUSA BACKUP ARCHITECTURE                            │
 │                                                                          │
-│  ┌──────────────┐                          ┌──────────────────────┐     │
-│  │  HCD Node 1  │                          │   S3 WORM Bucket     │     │
-│  │  (dc1/rack1) │    ┌──────────┐          │   (Object Lock)      │     │
-│  │  ┌─────────┐ │    │  Medusa  │   TLS    │  ┌────────────────┐  │     │
-│  │  │SSTable-1│ │    │  Agent   │─────────>│  │ node1/          │  │     │
-│  │  │SSTable-2│─┼───>│ (differ- │          │  │  backup-2025-01/│  │     │
-│  │  │SSTable-3│─┼───>│  ential) │          │  │   SSTable-2.db ←NEW│ │     │
-│  │  └─────────┘ │    └──────────┘          │  │   SSTable-3.db ←NEW│ │     │
-│  └──────────────┘     only new SSTables    │  │   (SSTable-1 already│ │     │
-│                       since last backup    │  │    in prior backup) │  │     │
-│  ┌──────────────┐                          │  └────────────────┘  │     │
-│  │  HCD Node 4  │    ┌──────────┐          │  ┌────────────────┐  │     │
-│  │  (dc2/rack1) │    │  Medusa  │   TLS    │  │ node4/          │  │     │
-│  │  ┌─────────┐ │    │  Agent   │─────────>│  │  backup-2025-01/│  │     │
-│  │  │SSTable-1│ │    │ (differ- │          │  │   SSTable-2.db ←NEW│ │     │
-│  │  │SSTable-2│─┼───>│  ential) │          │  │   (SSTable-1 already│ │     │
-│  │  └─────────┘ │    └──────────┘          │  │    in prior backup) │  │     │
-│  └──────────────┘                          │  └────────────────┘  │     │
-│                                            └──────────────────────┘     │
+│  ┌──────────────┐                          ┌──────────────────────┐    │
+│  │  HCD Node 1  │                          │   S3 WORM Bucket     │    │
+│  │  (dc1/rack1) │    ┌──────────┐          │   (Object Lock)      │    │
+│  │  ┌─────────┐ │    │  Medusa  │   TLS    │  ┌────────────────┐  │    │
+│  │  │SSTable-1│ │    │  Agent   │─────────>│  │ node1/          │  │    │
+│  │  │SSTable-2│─┼───>│ (differ- │          │  │  backup-2025-01/│  │    │
+│  │  │SSTable-3│─┼───>│  ential) │          │  │  SSTable-2 ←NEW │  │    │
+│  │  └─────────┘ │    └──────────┘          │  │  SSTable-3 ←NEW │  │    │
+│  └──────────────┘     only new SSTables    │  │  (1 already in  │  │    │
+│                       since last backup    │  │   prior backup)  │  │    │
+│  ┌──────────────┐                          │  └────────────────┘  │    │
+│  │  HCD Node 4  │    ┌──────────┐          │  ┌────────────────┐  │    │
+│  │  (dc2/rack1) │    │  Medusa  │   TLS    │  │ node4/          │  │    │
+│  │  ┌─────────┐ │    │  Agent   │─────────>│  │  backup-2025-01/│  │    │
+│  │  │SSTable-1│ │    │ (differ- │          │  │  SSTable-2 ←NEW │  │    │
+│  │  │SSTable-2│─┼───>│  ential) │          │  │  (1 already in  │  │    │
+│  │  └─────────┘ │    └──────────┘          │  │   prior backup)  │  │    │
+│  └──────────────┘                          │  └────────────────┘  │    │
+│                                            └──────────────────────┘    │
 │                                                                          │
 │  Key properties:                                                         │
 │  • Each node backs up independently (no SPOF)                           │
 │  • Differential: only new SSTables uploaded (saves bandwidth/cost)      │
 │  • Topology metadata saved alongside data (rack, tokens, schema)        │
 │  • Separate KMS key per backup set (compromising one ≠ all)             │
-│  • S3 Object Lock: COMPLIANCE mode, 90-day retention                    │
+│  • S3 Object Lock: COMPLIANCE mode, 30-day retention                    │
 │  • MFA Delete enabled: even root cannot delete without hardware MFA     │
 └──────────────────────────────────────────────────────────────────────────┘
 ```
@@ -1199,15 +1209,15 @@ HCD provides **5 distinct recovery paths**, each with different RTO characterist
 │             │   Copy snapshot SSTables back to data dir.                  │
 │             │                                                            │
 │             └── ALL nodes compromised                                    │
-│                        ├── Medusa backups in S3?                          │
-│                        ├── YES ──> PATH 4: Full Cluster Rebuild         │
-│                        │   (RTO = 85-115 min)                            │
-│                        │   Provision new nodes + Medusa restore.         │
+│                        ├── WORM snapshots in S3?                          │
+│                        ├── YES ──> PATH 4: WORM Snapshot Restore        │
+│                        │   (RTO = 30-60 min)                             │
+│                        │   Download snapshots from WORM, restore.        │
 │                        │                                                 │
-│                        └── NO ──> PATH 5: Commitlog Replay              │
+│                        └── PATH 5: WORM + Commitlog PITR                │
 │                                   (RTO = 30-90 min)                      │
-│                                   Last-resort: restore from archived     │
-│                                   commitlogs on WORM storage.            │
+│                                   Restore snapshot + replay archived     │
+│                                   commitlogs for point-in-time recovery. │
 └──────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -1259,37 +1269,36 @@ Restore from local or remote snapshots. Fastest when snapshots are on local disk
 | 4 | Restart HCD | 2-3 min |
 | 5 | `nodetool repair -pr` (catch up missed writes) | 5-15 min |
 
-#### Path 4: Full Cluster Rebuild from Medusa (RTO = 85-115 min)
+#### Path 4: WORM Snapshot Restore (RTO = 30-60 min)
 
-Worst-case scenario: all nodes compromised. Detailed timeline for 6-node cluster, 200GB/node:
+All local snapshots wiped by attacker, but WORM backups in S3 Object Lock are immutable. Timeline for 6-node cluster, 200GB/node:
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────┐
-│          FULL CLUSTER REBUILD TIMELINE (6 nodes, 200GB each)            │
+│          WORM SNAPSHOT RESTORE TIMELINE (6 nodes, 200GB each)           │
 │                                                                          │
 │  T+0 min   ┌─────────────────────────────────────────┐                  │
-│            │ Provision 6 new nodes (IaC/Terraform)   │  15 min          │
-│  T+15 min  ├─────────────────────────────────────────┤                  │
-│            │ Install HCD, configure cassandra.yaml   │   5 min          │
-│  T+20 min  ├─────────────────────────────────────────┤                  │
-│            │ Download from S3 (200GB × 6 parallel)   │  25-40 min       │
-│            │ (10Gbps: ~25min, 1Gbps: ~40min)         │                  │
-│  T+45-60   ├─────────────────────────────────────────┤                  │
-│            │ medusa restore-cluster                   │  20-30 min       │
-│            │ (load SSTables, rebuild indexes)         │                  │
-│  T+65-90   ├─────────────────────────────────────────┤                  │
-│            │ Start nodes, verify gossip convergence   │   5 min          │
-│  T+70-95   ├─────────────────────────────────────────┤                  │
-│            │ Replay CDC from Kafka (catch-up window)  │  10-15 min      │
-│  T+80-110  ├─────────────────────────────────────────┤                  │
-│            │ Validation: nodetool status + SELECT     │   5 min          │
-│  T+85-115  └─────────────────────────────────────────┘                  │
+│            │ Verify WORM integrity (SHA-256 checks)  │   2 min          │
+│  T+2 min   ├─────────────────────────────────────────┤                  │
+│            │ Download snapshots from WORM S3 bucket   │  10-25 min       │
+│            │ (10Gbps: ~10min, 1Gbps: ~25min)          │                  │
+│  T+12-27   ├─────────────────────────────────────────┤                  │
+│            │ Copy SSTables to data directories        │   5-10 min       │
+│            │ (sstableloader or direct copy)            │                  │
+│  T+17-37   ├─────────────────────────────────────────┤                  │
+│            │ Restart nodes, verify gossip convergence │   5 min          │
+│  T+22-42   ├─────────────────────────────────────────┤                  │
+│            │ nodetool repair -pr (catch-up window)    │   5-15 min       │
+│  T+27-57   ├─────────────────────────────────────────┤                  │
+│            │ Validation: nodetool status + SELECT     │   3 min          │
+│  T+30-60   └─────────────────────────────────────────┘                  │
 │                                                                          │
-│  TOTAL: ~1h 25min (10Gbps) to ~1h 55min (1Gbps)                       │
+│  TOTAL: ~30 min (10Gbps) to ~60 min (1Gbps)                            │
 │  ✓ Within 2-hour RTO benchmark for Tier-1 banking                       │
 │                                                                          │
+│  Note: In production, Medusa automates the download + load steps.       │
 │  For >500GB/node on 1Gbps: pre-position standby cluster                │
-│  or use 10Gbps network to stay within 2h                                │
+│  or use 10Gbps network to stay within 1h                                │
 └──────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -1309,11 +1318,13 @@ Last-resort path using archived commitlogs from WORM storage (see Section 11).
 
 | Path | Scenario | RTO | RPO | DORA Compliance |
 |------|----------|-----|-----|-----------------|
-| 1 - DC Failover | DC-level attack | **<1 min** | <1s typical (async inter-DC) | Art. 11, 12 ✓ |
+| 1 - DC Failover | DC-level attack | **<1 min** | 0 (with LOCAL_QUORUM) | Art. 11, 12 ✓ |
 | 2 - Streaming Rebuild | Single node compromised | **15-75 min** | 0 (other replicas current) | Art. 12 ✓ |
-| 3 - Snapshot Restore | Node data corrupted | **5-30 min** | Last snapshot interval | Art. 11, 12 ✓ |
-| 4 - Full Rebuild | Total cluster loss | **85-115 min** | Last Medusa backup + CDC | Art. 11, 12 ✓ |
-| 5 - Commitlog Replay | Backup + node loss | **30-90 min** | Last archived segment (~30s) | Art. 11, 12 ✓ |
+| 3 - Snapshot Restore | Table-level corruption | **5-30 min** | Last snapshot interval | Art. 11, 12 ✓ |
+| 4 - WORM Snapshot Restore | Ransomware (snapshots wiped) | **30-60 min** | Last WORM snapshot | Art. 11, 12 ✓ |
+| 5 - WORM + Commitlog PITR | Ransomware (full PITR) | **30-90 min** | ~minutes (last archived segment) | Art. 11, 12 ✓ |
+
+> **Note:** Path 4 replaces the earlier "Full Rebuild (Medusa, 85-115 min)" path. In the demo environment, MinIO Object Lock provides the WORM tier. In production, Medusa with S3 Object Lock provides equivalent functionality with automated scheduling.
 
 **All paths achieve RTO < 2 hours**, meeting the Tier-1 banking industry benchmark and satisfying DORA Article 12's requirement for defined, tested recovery objectives.
 
@@ -1700,28 +1711,29 @@ Each scenario and deep-dive section produces DORA compliance evidence. The full 
 │  │ #  │ DORA Requirement                         │ Status │ Module/  │  │
 │  │    │                                          │        │ Section  │  │
 │  ├────┼──────────────────────────────────────────┼────────┼──────────┤  │
-│  │  1 │ Data-at-rest encryption (Art.9)          │  PASS  │ Mod 73   │  │
-│  │  2 │ Least-privilege access (Art.9)           │  PASS  │ Mod 74   │  │
-│  │  3 │ Network segmentation (Art.9)             │  PASS  │ Mod 76   │  │
-│  │  4 │ DROP/TRUNCATE prevention (Art.9)         │  PASS  │ Mod 74   │  │
-│  │  5 │ Anomaly detection (Art.10)               │  PASS  │ Mod 74   │  │
-│  │  6 │ Continuous monitoring (Art.10)            │  PASS  │ Mod 72   │  │
-│  │  7 │ Zero-downtime on node loss (Art.11)      │  PASS  │ Mod 73   │  │
-│  │  8 │ Segregated backups (Art.11)              │  PASS  │ Mod 75   │  │
-│  │  9 │ Backup restoration test (Art.11)         │  PASS  │ Mod 75   │  │
-│  │ 10 │ RTO defined and tested (Art.11)            │  PASS  │ §13      │  │
-│  │ 11 │ RPO near-zero (Art.12)                   │  PASS  │ §11, 13  │  │
-│  │ 12 │ Recovery procedure test (Art.12)          │  PASS  │ Mod 75   │  │
-│  │ 13 │ Forensic trail available (Art.13)         │  PASS  │ Mod 74   │  │
-│  │ 14 │ Post-incident analysis (Art.13)           │  PASS  │ Mod 74   │  │
-│  │ 15 │ WORM commitlog archive (Art.11)           │  PASS  │ Mod 77   │  │
-│  │ 16 │ Immutable backup (S3 Object Lock) (Art.11)│  PASS  │ §12      │  │
-│  │ 17 │ CDC-augmented surgical restore (Art.12)   │  PASS  │ §12.4    │  │
-│  │ 18 │ 5 recovery paths documented (Art.12)      │  PASS  │ §13      │  │
-│  │ 19 │ IaC audit trail (Art.13)                  │  PASS  │ Mod 78   │  │
-│  │ 20 │ Auto-healing infrastructure (Art.9,12)     │  PASS  │ Mod 78   │  │
+│  │  1 │ ICT risk management framework (Art.6)    │  PASS  │ Mod 72   │  │
+│  │  2 │ Data-at-rest encryption (Art.9)          │  PASS  │ Mod 63   │  │
+│  │  3 │ Least-privilege access (Art.9)           │  PASS  │ Mod 62   │  │
+│  │  4 │ Network segmentation (Art.9)             │  PASS  │ Mod 77   │  │
+│  │  5 │ DROP/TRUNCATE prevention (Art.9)         │  PASS  │ Mod 27   │  │
+│  │  6 │ Anomaly detection (Art.10)               │  PASS  │ Mod 25   │  │
+│  │  7 │ Continuous monitoring (Art.10)            │  PASS  │ Mod 72   │  │
+│  │  8 │ Zero-downtime on node loss (Art.11)      │  PASS  │ Mod 77   │  │
+│  │  9 │ Segregated backups (Art.11)              │  PASS  │ Mod 73   │  │
+│  │ 10 │ Backup restoration test (Art.11)         │  PASS  │ Mod 76   │  │
+│  │ 11 │ RTO defined and tested (Art.11)          │  PASS  │ Mod 78   │  │
+│  │ 12 │ RPO near-zero (Art.12)                   │  PASS  │ Mod 74   │  │
+│  │ 13 │ Recovery procedure test (Art.12)         │  PASS  │ Mod 76   │  │
+│  │ 14 │ Forensic trail available (Art.13)        │  PASS  │ Mod 25   │  │
+│  │ 15 │ Post-incident analysis (Art.13)          │  PASS  │ Mod 78   │  │
+│  │ 16 │ WORM commitlog archive (Art.11)          │  PASS  │ Mod 74   │  │
+│  │ 17 │ Immutable backup (S3 Object Lock)(Art.11)│  PASS  │ Mod 73   │  │
+│  │ 18 │ Attack simulation (Art.26 TLPT)          │  PASS  │ Mod 75   │  │
+│  │ 19 │ 5 recovery paths documented (Art.12)     │  PASS  │ Mod 78   │  │
+│  │ 20 │ IaC audit trail (Art.13)                 │  PASS  │ Mod 78   │  │
+│  │ 21 │ Auto-healing infrastructure (Art.9,12)   │  PASS  │ Mod 78   │  │
 │  ├────┼──────────────────────────────────────────┼────────┼──────────┤  │
-│  │    │ OVERALL SCORE                            │ 20/20  │          │  │
+│  │    │ OVERALL SCORE                            │ 21/21  │          │  │
 │  └────┴──────────────────────────────────────────┴────────┴──────────┘  │
 └──────────────────────────────────────────────────────────────────────────┘
 ```
@@ -1760,20 +1772,27 @@ Each scenario and deep-dive section produces DORA compliance evidence. The full 
 
 ---
 
-## 18. Next Steps
+## 18. Implementation Status & Next Steps
 
-1. **Review this design** — validate scenarios (including S6-S7) against real banking threat models
-2. **Implement modules 72-78** — build the demo code in `demo-entropy.sh`:
-   - Module 72: DORA Introduction & Compliance Framework
-   - Module 73: S1-Encryptor Attack & Streaming Rebuild
-   - Module 74: S2-Insider Attack & Forensic Detection
-   - Module 75: S3-Backup Killer & Preservation
-   - Module 76: S5-DC Destroyer & Multi-DC Recovery
-   - Module 77: S6-Time Bomb & Commitlog WORM Recovery
-   - Module 78: S7-K8s Auto-Healing (conceptual, with CRD examples)
-3. **Add DORA scorecard** — extend `--score` mode with 20-point DORA compliance checks
-4. **Update DEMO_ENTROPY.md** — add Part 9 documentation (modules 72-78)
-5. **Update tests** — add content tests for modules 72-78
-6. **Proof of concept** — implement commitlog archiving to local staging dir for demo environment
-7. **K8ssandra migration guide** — create `K8SSANDRA_MIGRATION.md` with step-by-step migration from Docker Compose
-8. **Create presentation deck** — extract diagrams for executive presentation
+### Completed
+
+1. **Modules 72-78 implemented** in `demo-entropy.sh` (Part 9: DORA Ransomware Resilience):
+   - Module 72: Kill Chain & Infrastructure Setup (DORA quiz, dora_bank keyspace, MinIO WORM)
+   - Module 73: Backup to WORM & Integrity Verification (snapshots, SHA-256, Object Lock test)
+   - Module 74: Commitlog Archiving to WORM (WAL archiving, two-tier WORM)
+   - Module 75: The Attack Simulation (5-phase ransomware: recon, exfil, TRUNCATE, snapshot wipe, ransom note)
+   - Module 76: Recovery from WORM Backups (integrity verify, restore, cross-DC consistency)
+   - Module 77: DC Failover Under Attack (network partition, LOCAL_QUORUM, repair convergence)
+   - Module 78: DORA Compliance Scorecard & K8s Auto-Healing (article matrix, recovery paths, K8ssandra CRD)
+2. **DORA scorecard** — `--score` mode validates all 79 modules (79/79)
+3. **DEMO_ENTROPY.md** — Part 9 documentation added (overview table + module body sections)
+4. **Tests** — 184/184 tests pass (content tests for modules 72-78 included)
+5. **MinIO WORM** — docker-compose.yml service under `ransomware` profile; `ensure_minio()` helper in script
+6. **Commitlog archiving** — configured via `commitlog_archiving.properties` in module 74
+
+### Remaining
+
+1. **S2 (Insider) & S4 (Silent Infiltrator) deep modules** — partially covered by existing modules 25-27 (CDC, audit, guardrails) and 62 (RBAC); dedicated ransomware-specific modules not yet implemented
+2. **K8ssandra migration guide** — create `K8SSANDRA_MIGRATION.md` with step-by-step migration from Docker Compose
+3. **Presentation deck** — extract diagrams for executive presentation
+4. **Production commitlog archiving** — current demo uses local `cp`; production would use `s3cmd`/`aws s3 cp` to WORM directly

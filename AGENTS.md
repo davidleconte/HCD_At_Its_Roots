@@ -4,7 +4,12 @@
 
 ```
 ├── config/                 # Configuration templates
-│   └── cassandra.yaml.template
+│   ├── cassandra.yaml.template
+│   ├── prometheus.yml      # Prometheus scrape config for JMX metrics
+│   ├── jmx-exporter.yml   # JMX-to-Prometheus metric mapping
+│   └── grafana/            # Grafana provisioning (datasource + dashboard)
+│       ├── provisioning/
+│       └── dashboards/
 ├── scripts/               # Automation scripts
 │   ├── docker-entrypoint.sh
 │   ├── generate-topology.py
@@ -14,15 +19,17 @@
 ├── tests/                 # Pytest test suites
 │   ├── test_demo_entropy.py
 │   ├── test_topology.py
-│   └── test_scripts.py
-├── .github/workflows/     # CI/CD
-│   └── ci.yml
+│   ├── test_topology_unit.py
+│   ├── test_scripts.py
+│   └── __init__.py
 ├── .env.example           # Environment variable template
-├── docker-compose.yml     # Multi-node cluster definition (768M per node)
+├── docker-compose.yml     # Multi-node cluster definition (1024M per node)
 ├── Dockerfile             # Container image definition
 ├── Makefile               # Developer shortcuts (make up/down/demo/test)
 ├── DEMO_ENTROPY.md        # Didactic demo documentation
+├── RANSOMWARE_DORA_DESIGN.md  # DORA ransomware resilience design doc
 ├── CLAUDE.md              # Claude Code guidance
+├── AGENTS.md              # Development guidelines
 └── README.md              # Project documentation
 ```
 
@@ -55,8 +62,14 @@ pytest tests/
 # Demo script tests (dry-run mode, no cluster needed)
 pytest tests/test_demo_entropy.py -v
 
-# Topology generator tests
+# Topology generator tests (integration — runs script as subprocess)
 pytest tests/test_topology.py -v
+
+# Topology unit tests (imports generate_topology() directly)
+pytest tests/test_topology_unit.py -v
+
+# Script syntax and helper tests
+pytest tests/test_scripts.py -v
 
 # Run a single test
 pytest tests/test_demo_entropy.py::test_dry_run_execution -v
@@ -70,16 +83,15 @@ Tests use `--dry-run` mode so they don't require a running cluster.
 
 ## Running the Demo
 
-The Entropy & Consistency demo is an interactive, didactic script (72 modules, 0-71) that explains HCD internals through hands-on scenarios.
+The Entropy & Consistency demo is an interactive, didactic script (79 modules, 0-78) that explains HCD internals through hands-on scenarios, including a DORA ransomware resilience suite (modules 72-78) with MinIO WORM backups.
 
-**Review Status:** Grade A (Jonathan Ellis).
 *Focus areas: Entropy resolution, SAI composability, mutation-based write path, multi-DC failover (Module 23), CDC, audit logging, and guardrails.*
 
 ```bash
 # Full interactive demo
 ./scripts/demo-entropy.sh
 
-# Run specific module (0-71)
+# Run specific module (0-78)
 ./scripts/demo-entropy.sh 3
 
 # Non-interactive mode (no pauses)
@@ -104,7 +116,7 @@ To add Module N to `demo-entropy.sh`:
        takeaway "Key learning point"
        ;;
    ```
-2. Update the validation regex: `^([0-9]|[1-4][0-9]|5[0-3])$` (adjust upper bound)
+2. Update the validation regex: `^([0-9]|[1-6][0-9]|7[0-8])$` (adjust upper bound)
 3. Update the main loop range: `for i in {0..N}`
 4. Add the module to `DEMO_ENTROPY.md` (overview list + body section)
 5. Update `tests/test_demo_entropy.py`: adjust `range(N+1)` in parametrize and full-run test

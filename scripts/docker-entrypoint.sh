@@ -4,11 +4,11 @@ set -e
 
 # Set defaults for required environment variables
 : "${CASSANDRA_CLUSTER_NAME:=HCDCluster}"
-: "${CASSANDRA_SEEDS:=172.28.0.2}"
+: "${CASSANDRA_SEEDS:=172.28.0.2,172.28.0.5}"
 : "${CASSANDRA_LISTEN_ADDRESS:=127.0.0.1}"
 : "${CASSANDRA_BROADCAST_ADDRESS:=$CASSANDRA_LISTEN_ADDRESS}"
 : "${CASSANDRA_RPC_ADDRESS:=0.0.0.0}"
-: "${CASSANDRA_ENDPOINT_SNITCH:=SimpleSnitch}"
+: "${CASSANDRA_ENDPOINT_SNITCH:=GossipingPropertyFileSnitch}"
 : "${CASSANDRA_DC:=dc1}"
 : "${CASSANDRA_RACK:=rack1}"
 
@@ -23,6 +23,17 @@ if [ -z "${CASSANDRA_LISTEN_ADDRESS}" ] || [ "${CASSANDRA_LISTEN_ADDRESS}" = "12
     fi
 fi
 
+# Validate heap size values (allow only digits followed by optional k/m/g suffix)
+validate_heap_value() {
+    local name="$1" value="$2"
+    if [ -n "$value" ] && ! echo "$value" | grep -qE '^[0-9]+[kKmMgG]?$'; then
+        echo "ERROR: $name contains invalid characters: '$value' (expected format: 512M, 100M, etc.)"
+        exit 1
+    fi
+}
+validate_heap_value "MAX_HEAP_SIZE" "${MAX_HEAP_SIZE:-}"
+validate_heap_value "HEAP_NEWSIZE" "${HEAP_NEWSIZE:-}"
+
 # Generate cassandra.yaml from template
 TEMPLATE="/opt/hcd/resources/cassandra/conf/cassandra.yaml.template"
 CONF_OUTPUT="/opt/hcd/resources/cassandra/conf/cassandra.yaml"
@@ -30,7 +41,14 @@ if [ ! -f "$TEMPLATE" ]; then
     echo "ERROR: Template file not found: $TEMPLATE"
     exit 1
 fi
-envsubst < "$TEMPLATE" > "$CONF_OUTPUT"
+if ! command -v envsubst >/dev/null 2>&1; then
+    echo "ERROR: envsubst not found. Install gettext-base package."
+    exit 1
+fi
+if ! envsubst < "$TEMPLATE" > "$CONF_OUTPUT"; then
+    echo "ERROR: envsubst failed to process template."
+    exit 1
+fi
 if [ ! -s "$CONF_OUTPUT" ]; then
     echo "ERROR: Generated cassandra.yaml is empty. Check template variables."
     exit 1
@@ -43,11 +61,26 @@ if [ "$CASSANDRA_ENDPOINT_SNITCH" = "GossipingPropertyFileSnitch" ]; then
     echo "prefer_local=true" >> /opt/hcd/resources/cassandra/conf/cassandra-rackdc.properties
 fi
 
-# Apply JVM heap settings if provided
+# Apply JVM heap settings if provided (sed replaces existing, or appends if not found)
 JVM_OPTIONS="/opt/hcd/resources/cassandra/conf/jvm-server.options"
 if [ -n "$MAX_HEAP_SIZE" ] && [ -f "$JVM_OPTIONS" ]; then
-    sed -i "s/^-Xmx.*/-Xmx${MAX_HEAP_SIZE}/" "$JVM_OPTIONS"
-    sed -i "s/^-Xms.*/-Xms${MAX_HEAP_SIZE}/" "$JVM_OPTIONS"
+    if grep -q "^-Xmx" "$JVM_OPTIONS"; then
+        sed -i "s|^-Xmx.*|-Xmx${MAX_HEAP_SIZE}|" "$JVM_OPTIONS"
+    else
+        echo "-Xmx${MAX_HEAP_SIZE}" >> "$JVM_OPTIONS"
+    fi
+    if grep -q "^-Xms" "$JVM_OPTIONS"; then
+        sed -i "s|^-Xms.*|-Xms${MAX_HEAP_SIZE}|" "$JVM_OPTIONS"
+    else
+        echo "-Xms${MAX_HEAP_SIZE}" >> "$JVM_OPTIONS"
+    fi
+fi
+if [ -n "$HEAP_NEWSIZE" ] && [ -f "$JVM_OPTIONS" ]; then
+    if grep -q "^-Xmn" "$JVM_OPTIONS"; then
+        sed -i "s|^-Xmn.*|-Xmn${HEAP_NEWSIZE}|" "$JVM_OPTIONS"
+    else
+        echo "-Xmn${HEAP_NEWSIZE}" >> "$JVM_OPTIONS"
+    fi
 fi
 
 # Extract first seed from comma-separated list, trimming whitespace
@@ -58,11 +91,11 @@ if [ -z "$FIRST_SEED" ]; then
     exit 1
 fi
 
-# Do not wait if we are the seed node
-if [ "$CASSANDRA_LISTEN_ADDRESS" = "$FIRST_SEED" ]; then
+# Do not wait if we are a seed node (check all seeds, not just the first)
+if echo ",${CASSANDRA_SEEDS}," | tr -d '[:space:]' | grep -q ",${CASSANDRA_LISTEN_ADDRESS},"; then
     echo "Starting as seed node..."
 else
-    echo "This node ($CASSANDRA_LISTEN_ADDRESS) is not the seed. Waiting for seed node at $FIRST_SEED..."
+    echo "This node ($CASSANDRA_LISTEN_ADDRESS) is not a seed. Waiting for seed node at $FIRST_SEED..."
     
     # Phase 1: Wait for TCP port to be open (exponential backoff: 1s, 2s, 4s, ... capped at 10s)
     MAX_RETRIES=30

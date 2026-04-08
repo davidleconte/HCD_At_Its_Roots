@@ -29,7 +29,7 @@ def test_entrypoint_defaults():
             set -e
             # Mock envsubst and other commands to prevent actual execution
             : "${CASSANDRA_CLUSTER_NAME:=HCDCluster}"
-            : "${CASSANDRA_SEEDS:=172.28.0.2}"
+            : "${CASSANDRA_SEEDS:=172.28.0.2,172.28.0.5}"
             : "${CASSANDRA_LISTEN_ADDRESS:=127.0.0.1}"
             : "${CASSANDRA_DC:=dc1}"
             : "${CASSANDRA_RACK:=rack1}"
@@ -43,7 +43,7 @@ def test_entrypoint_defaults():
     )
     assert result.returncode == 0
     assert "CLUSTER=HCDCluster" in result.stdout
-    assert "SEEDS=172.28.0.2" in result.stdout
+    assert "SEEDS=172.28.0.2,172.28.0.5" in result.stdout
     assert "DC=dc1" in result.stdout
     assert "RACK=rack1" in result.stdout
 

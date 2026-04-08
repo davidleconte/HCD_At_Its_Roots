@@ -1,5 +1,9 @@
 FROM eclipse-temurin:11-jre
 
+LABEL maintainer="HCD Docker Cluster" \
+      description="IBM HCD multi-node cluster for development and demos" \
+      version="1.2.3"
+
 # Install dependencies:
 # - gettext-base for envsubst
 # - netcat-openbsd for seed checking
@@ -17,7 +21,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Install uv and setup Python environment
-COPY --from=ghcr.io/astral-sh/uv:0.5 /uv /bin/uv
+COPY --from=ghcr.io/astral-sh/uv:0.5.14 /uv /bin/uv
 ENV UV_PYTHON_INSTALL_DIR=/opt/python
 ENV VIRTUAL_ENV=/opt/venv
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
@@ -26,7 +30,7 @@ ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 # UV_PYTHON_INSTALL_DIR ensures Python is installed in a shared location
 # accessible to the non-root cassandra user at runtime
 RUN uv venv $VIRTUAL_ENV --python 3.11 && \
-    uv pip install cassandra-driver
+    uv pip install cassandra-driver==3.29.2
 
 # Create cassandra user and directories with fixed IDs for Podman/Rootless consistency
 # Fixed UIDs ensure that file ownership remains consistent when mapping volumes in rootless mode
@@ -50,9 +54,13 @@ RUN for cmd in nodetool cqlsh hcd sstableloader sstabledump sstablemetadata; do 
 
 # Download JMX Prometheus exporter (optional: for --profile monitoring)
 ARG JMX_EXPORTER_VERSION=0.20.0
-RUN curl -fsSL -o /opt/hcd/jmx_prometheus_javaagent.jar \
-    "https://repo1.maven.org/maven2/io/prometheus/jmx/jmx_prometheus_javaagent/${JMX_EXPORTER_VERSION}/jmx_prometheus_javaagent-${JMX_EXPORTER_VERSION}.jar" \
-    2>/dev/null || echo "JMX exporter download skipped (no internet). Monitoring profile will be unavailable."
+RUN if curl -fsSL -o /tmp/jmx_exporter.jar \
+    "https://repo1.maven.org/maven2/io/prometheus/jmx/jmx_prometheus_javaagent/${JMX_EXPORTER_VERSION}/jmx_prometheus_javaagent-${JMX_EXPORTER_VERSION}.jar" 2>/dev/null; then \
+        mv /tmp/jmx_exporter.jar /opt/hcd/jmx_prometheus_javaagent.jar; \
+        echo "JMX Prometheus exporter ${JMX_EXPORTER_VERSION} installed."; \
+    else \
+        echo "WARNING: JMX exporter download failed (no internet?). Monitoring profile will be unavailable." >&2; \
+    fi
 COPY config/jmx-exporter.yml /opt/hcd/jmx-exporter.yml
 
 WORKDIR /opt/hcd
@@ -76,5 +84,7 @@ ENV MAX_HEAP_SIZE="512M"
 ENV HEAP_NEWSIZE="100M"
 
 USER cassandra
+
+EXPOSE 9042 7000 7001 9404
 
 ENTRYPOINT ["/docker-entrypoint.sh"]
