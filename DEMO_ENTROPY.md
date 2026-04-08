@@ -1,15 +1,57 @@
 # HCD Entropy & Consistency Didactic Demo
 > **Executive Summary:** An 84-module interactive demo proving that IBM HCD delivers zero-downtime resilience, automatic self-healing, and tunable consistency across datacenters — including a full DORA ransomware resilience scenario with WORM-protected backups. Designed for live stakeholder presentations and hands-on engineering onboarding.
 >
-> **Why this matters:** Unplanned database downtime costs enterprises $5,600-$9,000 per minute (Gartner). This demo proves — live, on your laptop — that HCD survives datacenter-level failures with zero data loss and zero application errors, eliminating the single largest source of availability risk in distributed data infrastructure.
+> **Why this matters:** Unplanned database downtime costs enterprises $5,600-$9,000 per minute [1]. This demo proves — live, on your laptop — that HCD survives datacenter-level failures with zero data loss and zero application errors, eliminating the single largest source of availability risk in distributed data infrastructure.
 
 | | |
 |---|---|
 | **Modules** | 84 (0-83), organized in 10 parts |
 | **Cluster** | 6 nodes, 2 DCs, RF=3 per DC |
-| **Time (interactive)** | ~3-4 hours (full), ~20 min per part |
+| **Time (interactive)** | ~4-5 hours (full), ~20-35 min per part |
 | **Time (non-interactive)** | ~60-90 minutes |
 | **Prerequisites** | Docker, `hcd-1.2.3-bin.tar.gz` |
+
+---
+
+## Preface
+
+### Who This Book Is For
+
+This handbook is for **database engineers, architects, SREs, and technical decision-makers** evaluating or operating IBM HCD (Hyperledger Cassandra Distribution) in production. It assumes basic familiarity with relational databases and Linux command-line tools. No prior Cassandra experience is required — Part 1 builds from first principles.
+
+**If you are a:**
+- **Database engineer** — you will learn HCD internals through hands-on experiments that reveal how distributed consensus, replication, and repair actually work under the hood.
+- **Solutions architect** — you will gain the technical vocabulary and live demonstrations to evaluate HCD against RDBMS alternatives for high-availability use cases.
+- **SRE / Operations engineer** — Parts 3, 4, 7, 8, and 10 focus on production operations: backup/restore, repair scheduling, JVM tuning, monitoring, and incident response.
+- **Compliance officer / CISO** — Part 9 provides a complete DORA ransomware resilience demonstration mapped to specific EU regulation articles.
+
+### How to Use This Book
+
+This is a **hands-on lab manual**, not a reference text. Every concept is demonstrated with live commands against a real 6-node cluster running on your laptop. The 84 modules are organized in 10 parts of increasing complexity.
+
+**Three ways to use this material:**
+
+1. **Full sequential walkthrough** (~4-5 hours): Run all 84 modules in order. Best for first-time learners and comprehensive onboarding.
+2. **Part-by-part sessions** (~20-35 min each): Work through one part per sitting. Suggested break points are marked in the demo roadmap.
+3. **Targeted deep-dives**: Jump to any module by number (`./demo-entropy.sh 23`). Modules > 1 auto-create required keyspaces.
+
+**Conventions used:**
+- `[DRY-RUN]` — commands shown but not executed (use `--dry-run` flag)
+- `>>> Look for:` — observation hints telling you what to verify in the output
+- `--- Takeaway ---` — key learning points summarizing each module
+- `QUESTION:` / `ANSWER:` — interactive questions to test understanding before revealing answers
+- `CHALLENGE:` — optional stretch exercises for deeper exploration
+
+### What You Will Learn
+
+By the end of this handbook, you will be able to:
+
+- Design and operate a multi-datacenter HCD cluster with tunable consistency
+- Explain and demonstrate the three-layer entropy defense (hinted handoff, read repair, anti-entropy repair)
+- Perform live failover, backup/restore, rolling restart, and repair operations
+- Evaluate HCD's suitability for DORA-regulated financial services environments
+- Tune JVM, compaction, compression, and caching for production workloads
+- Build applications using HCD drivers with token-aware routing, speculative execution, and retry policies
 
 ---
 
@@ -45,20 +87,62 @@
 
 | Term | Definition |
 |------|-----------|
-| **RF** (Replication Factor) | Number of copies of each piece of data across the cluster |
-| **CL** (Consistency Level) | Number of replicas that must acknowledge a read/write for success |
-| **LWW** (Last-Write-Wins) | Conflict resolution strategy: the write with the newest timestamp wins |
-| **Merkle Tree** | Hash tree used to efficiently compare data between replicas during repair |
-| **Tombstone** | A delete marker written to disk; physically removed after `gc_grace_seconds` |
-| **Hinted Handoff** | Temporary storage of writes destined for a downed node, replayed on recovery |
-| **Anti-Entropy Repair** | Background process that compares all replicas using Merkle Trees |
-| **SSTable** | Sorted String Table — immutable on-disk file storing data |
-| **Memtable** | In-memory write buffer; flushed to SSTables periodically |
-| **SAI** | Storage Attached Indexing — index structures stored alongside SSTables |
-| **ANN** | Approximate Nearest Neighbor — algorithm for vector similarity search |
-| **CDC** | Change Data Capture — mutation event streaming for downstream consumers |
-| **LWT** | Lightweight Transaction — Paxos-based compare-and-set operations |
-| **Gossip** | Peer-to-peer protocol for failure detection and metadata propagation |
+| **ANN** (Approximate Nearest Neighbor) | Search algorithm used with SAI vector indexes that finds semantically similar vectors without exhaustive comparison, trading recall for speed. |
+| **Anti-Entropy Repair** | Process that synchronizes data across replicas by comparing Merkle trees and streaming missing or divergent data to bring replicas into agreement. |
+| **Bloom Filter** | Probabilistic, space-efficient data structure used to test whether a partition exists in an SSTable; false positives are possible but false negatives are not. |
+| **Bootstrap** | Process by which a new node joins the ring, streams the data it is responsible for from existing replicas, and begins serving traffic. |
+| **CAP Theorem** | Theoretical result stating that a distributed system can guarantee at most two of Consistency, Availability, and Partition Tolerance simultaneously. |
+| **CDC** (Change Data Capture) | Feature that logs every mutation to special CDC log files, enabling downstream consumers to stream real-time changes out of HCD. |
+| **CL** (Consistency Level) | Per-operation setting controlling how many replicas must acknowledge a read or write before the coordinator considers the operation successful. |
+| **Clustering Key** | Column(s) that determine on-disk sort order within a partition; combined with the partition key, they form the full primary key. |
+| **CommitLog** | Write-ahead log on each node that durably records every mutation before it is applied to the Memtable, used for crash recovery. |
+| **Compaction (LCS)** | Leveled Compaction Strategy — organizes SSTables into size-bounded levels, keeping read amplification low at the cost of higher write I/O. |
+| **Compaction (STCS)** | Size-Tiered Compaction Strategy — merges SSTables of similar size, optimizing for write throughput but potentially producing large SSTables. |
+| **Compaction (TWCS)** | Time-Window Compaction Strategy — groups SSTables by configurable time windows, ideal for time-series data with TTL-based expiry. |
+| **Compaction (UCS)** | Unified Compaction Strategy — single tunable framework (HCD 1.2+ / Cassandra 5.0+) that can approximate STCS, LCS, or TWCS behavior. |
+| **CompressedOops** | JVM optimization that compresses 64-bit object pointers to 32 bits when heap size is below ~31 GB, reducing memory overhead. |
+| **Coordinator** | Node that receives a client request, routes it to the appropriate replicas, and aggregates the response based on consistency level. |
+| **Counter** | Special column type supporting atomic increment/decrement operations; must live in a dedicated table and cannot use LWT. |
+| **CQL** (Cassandra Query Language) | SQL-like query language for HCD/Cassandra; shares SELECT/INSERT/UPDATE/DELETE syntax but operates on distributed partitions. |
+| **Datacenter** | Logical grouping of nodes within a cluster, typically mapped to a physical location or cloud region; used for replication targeting. |
+| **Decommission** | Graceful removal of a node whereby it streams all token ranges to remaining replicas before leaving the cluster permanently. |
+| **DORA** | EU Regulation 2022/2554 (Digital Operational Resilience Act) requiring financial entities to demonstrate ICT risk management and resilience testing. |
+| **Frozen Collection** | Collection type (list, set, or map) serialized as a single opaque blob; the entire value must be overwritten to update any element. |
+| **gc_grace_seconds** | Period after which a tombstone is eligible for purging during compaction; must exceed the repair cycle interval to prevent zombie data. |
+| **Gossip** | Peer-to-peer protocol by which nodes periodically exchange state information (load, tokens, status) with a small set of peers. |
+| **Hinted Handoff** | Mechanism where the coordinator stores a "hint" for writes destined for an unavailable replica and replays them on recovery. |
+| **K8ssandra** | Open-source Kubernetes operator stack for HCD/Cassandra bundling automated repair (Reaper), backup (Medusa), and monitoring. |
+| **LWT** (Lightweight Transaction) | Conditional read-modify-write operation via Paxos consensus, providing linearizable consistency at the cost of additional round trips. |
+| **LWW** (Last-Write-Wins) | Default conflict-resolution strategy using cell-level timestamps to determine which value survives concurrent writes. |
+| **Materialized View** | Server-side denormalization that automatically maintains a derived table with a different primary key, updated with the base table. |
+| **Medusa** | Open-source backup/restore tool for Cassandra/HCD supporting S3-compatible, GCS, and Azure blob storage backends. |
+| **Memtable** | In-memory write buffer where mutations accumulate after being written to the CommitLog; flushed to an SSTable when full. |
+| **Merkle Tree** | Hash tree used during repair where each leaf represents a token range digest; differing subtrees identify ranges needing sync. |
+| **Nodetool** | Primary CLI administration tool for HCD/Cassandra; used for status, repair, decommission, compaction, and operational tasks. |
+| **Object Lock** | S3-compatible WORM enforcement preventing objects from being deleted or overwritten for a defined retention period. |
+| **Off-Heap Memory** | JVM memory outside the managed heap; used for row caches, Bloom filters, and key caches to reduce GC impact. |
+| **Partition Key** | First component of a table's primary key; its hash determines which token range — and which replicas — own the row. |
+| **Prepared Statement** | CQL statement parsed and validated on the server once, then executed repeatedly by referencing its ID, reducing per-query overhead. |
+| **RBAC** | Role-Based Access Control — security model where permissions on keyspaces, tables, and functions are granted to named roles. |
+| **Rack** | Logical subdivision within a datacenter used by the snitch to place replicas on different failure domains. |
+| **Read Repair** | Consistency mechanism where the coordinator compares replica responses during a read and patches stale replicas with the latest data. |
+| **Reaper** | Open-source repair scheduler that orchestrates incremental or full repairs across the cluster with configurable parallelism. |
+| **Replica** | A node holding a copy of the data for a particular token range, as determined by the replication factor. |
+| **RF** (Replication Factor) | Total number of copies of each partition stored across the cluster; RF=3 means every row exists on three distinct nodes. |
+| **SAI** (Storage-Attached Index) | Per-SSTable index implementation enabling efficient predicate queries on non-primary-key columns without global index tables. |
+| **Seed Node** | Well-known node address that new or restarting nodes contact first to bootstrap gossip and learn cluster topology. |
+| **Snitch** | Component that tells HCD about network topology (rack and datacenter membership), used to optimize replica placement. |
+| **Speculative Execution** | Driver-side strategy that issues a duplicate request to a second replica if the first hasn't responded within a latency threshold. |
+| **SSTable** (Sorted String Table) | Immutable on-disk file written when a Memtable is flushed; merged during compaction but never modified in place. |
+| **Streaming** | Bulk transfer of SSTable data between nodes during bootstrap, decommission, repair, or DC expansion. |
+| **TDE** (Transparent Data Encryption) | Encryption of SSTable data at rest; data is decrypted on read without application-level changes. |
+| **Token** | 64-bit integer derived from a partition key hash; the full token ring is divided into ranges assigned to nodes. |
+| **TokenAwarePolicy** | Driver load-balancing policy that routes requests directly to partition-owning replicas, minimizing coordinator hops. |
+| **Tombstone** | Deletion marker written to flag data as deleted; retained until `gc_grace_seconds` has elapsed and purged during compaction. |
+| **TTL** (Time To Live) | Per-cell or per-row expiry value in seconds; after TTL elapses, data is tombstoned and removed during compaction. |
+| **UDT** (User-Defined Type) | Named, reusable composite type defined at keyspace level that groups multiple named fields, embeddable as a column type. |
+| **Vnode** (Virtual Node) | Logical subdivision of the token ring assigned to a physical node; enables smoother load distribution and faster bootstrapping. |
+| **WORM** (Write Once Read Many) | Storage policy preventing data modification or deletion after initial write, used for immutable backup archives. |
 
 ---
 
@@ -112,7 +196,7 @@ This demo uses a 6-node, multi-DC cluster simulated in Docker.
 | 7 | Token Ring | 256 vnodes per node, trace version disclaimer |
 | 8 | Write Path Trace | LOCAL_QUORUM mutation forwarding, version-aware trace notes |
 | 9 | Read Path Trace | Digest vs full-data request, version-aware trace notes |
-| 10 | Node Recovery | Interactive question + hint replay verification |
+| 10 | Node Recovery — The Full Picture | Gossip state, hint metrics, max_hint_window gap, three-layer defense recap |
 | 11 | Tombstones | Delete markers survive compaction until gc_grace |
 | 12 | Lightweight Transactions | Paxos IF NOT EXISTS prevents double-booking |
 | 13 | Summary & Health Check | Schema agreement, all nodes UN |
@@ -236,7 +320,7 @@ make destroy     # or: docker compose down -v
 
 The opening module verifies the cluster is healthy, introduces the 6-node, 2-DC topology, and presents a 9-part roadmap of the entire demo.
 
-### 9-Part Roadmap
+### 10-Part Roadmap
 - **Part 1 — Foundations** (Modules 0-13): Replication, consistency levels, hinted handoff, read repair, anti-entropy repair
 - **Part 2 — Advanced Failures** (Modules 14-24): Ghost rack, zombie node, network partition, SAI, vector search, DC kill
 - **Part 3 — Operations** (Modules 25-37): CDC, audit logging, guardrails, data modeling, compaction, compression, backup/restore
@@ -468,7 +552,7 @@ TRACING OFF;
 
 ---
 
-## Module 10: Node Recovery - Hint Replay
+## Module 10: Node Recovery — The Full Picture
 
 Interactive question: **"After a node restarts, how does it know what data it missed?"** — pause — answer: other coordinators stored hints during the outage, and gossip triggers automatic replay.
 
@@ -2003,3 +2087,349 @@ Maps all demo modules to specific DORA articles (Art. 6, 9, 10, 11, 12, 13, 19, 
 **Takeaway:** DORA compliance is not a checkbox — it requires demonstrated, tested resilience. This demo provides live proof for Art. 6 (risk framework), Art. 9 (protection), Art. 10 (detection), Art. 11 (business continuity), Art. 12 (backup), Art. 13 (learning), Art. 19 (reporting), and Art. 26 (TLPT). K8ssandra automates ongoing compliance.
 
 **Key concepts:** DORA compliance matrix, incident reporting (Art. 19), recovery path selection, K8ssandra operator, Medusa automated backups, Reaper repair scheduling.
+
+## Module 79: Counter Columns
+
+Demonstrates counter columns — the only non-idempotent operation in HCD. Creates a `page_views` counter table, performs increments and decrements, and explains the counter shard replication model. Covers why counters must live in dedicated tables, cannot use LWT, and require frequent repair.
+
+**What to look for:** Counter values accumulate across multiple UPDATE statements. Decrement is supported (counters can go negative). No INSERT syntax — only UPDATE with `+ N` or `- N`.
+
+**Takeaway:** Counters are add-only operations that cannot be replayed safely. Use them for approximate metrics (page views, API calls), never for financial balances. Run `nodetool repair -pr` frequently on counter tables to prevent shard drift.
+
+**Key concepts:** Non-idempotent writes, counter shards, dedicated counter tables, counter repair, CL recommendations for counters.
+
+## Module 80: Prepared Statements & Driver Best Practices
+
+Covers the performance difference between simple and prepared CQL statements (parse-once, execute-many pattern). Demonstrates connection pooling defaults, idempotency flags, and the prepared statement leak anti-pattern. References Modules 43-46 for driver policy details.
+
+**What to look for:** Tracing output shows "Parsing" and "Preparing statement" steps that prepared statements skip on re-execution. Connection pool defaults show 1 connection per host handles ~1024 concurrent requests.
+
+**Takeaway:** Prepare statements once at startup, reuse forever — 10x less coordinator CPU. Never concatenate values into CQL strings. Mark idempotent queries for safe retry and speculative execution.
+
+**Key concepts:** Prepared vs simple statements, bind variables, connection multiplexing (protocol v4), idempotency flags, prepared statement cache leak.
+
+## Module 81: JVM & GC Tuning
+
+Inspects live JVM heap usage and GC statistics. Explains heap sizing rules (max 31 GB for CompressedOops), GC algorithm selection (G1 default, ZGC experimental), and off-heap memory components. Provides a production tuning checklist.
+
+**What to look for:** `nodetool info` shows heap used/total and off-heap memory. `nodetool gcstats` shows GC interval and pause times. JVM options file reveals the configured GC algorithm.
+
+**Takeaway:** Never exceed 31 GB heap (CompressedOops boundary). Set -Xms = -Xmx to avoid resize pauses. Leave 30-50% of RAM for OS page cache — it is critical for SSTable read performance. Monitor GC pauses: > 1 second = client timeouts.
+
+**Key concepts:** CompressedOops, G1GC vs ZGC, off-heap memory (bloom filters, compression metadata), page cache, heap sizing rules.
+
+## Module 82: CQL Aggregation & Analytics Functions
+
+Demonstrates COUNT, SUM, AVG, MIN, MAX within a partition (safe) and across partitions (dangerous). Creates a `daily_sales` table and shows GROUP BY with clustering columns. Explains coordinator-side aggregation and why full-table scans are problematic.
+
+**What to look for:** Within-partition aggregation is fast and bounded. Cross-partition COUNT scans the entire cluster. GROUP BY must follow PRIMARY KEY column order.
+
+**Takeaway:** CQL aggregates work best within a single partition. For cross-partition analytics, use pre-aggregated counter tables, materialized views, or Apache Spark. Full-table aggregation is O(n) on the dataset — there is no global row count metadata.
+
+**Key concepts:** Coordinator-side aggregation, partition-scoped queries, GROUP BY restrictions, user-defined aggregates (UDA), Spark integration.
+
+## Module 83: Collection Types Deep-Dive (Frozen vs Non-Frozen)
+
+Demonstrates SET, LIST, and MAP collection types with both frozen and non-frozen semantics. Shows partial updates (non-frozen) vs full replacement (frozen), nested collections with frozen inner types, and concurrent set mutation semantics (element-level LWW).
+
+**What to look for:** Non-frozen collections allow adding/removing individual elements. Frozen collections require full replacement. Nested collections require `frozen<>` on inner types. Concurrent adds to non-frozen sets produce a union (both survive).
+
+**Takeaway:** Use non-frozen for element-level updates, frozen for atomic replacement or nesting. Prefer SETs over LISTs (lists have read-before-write anti-patterns). Keep collections small (< 64 KB) — for large datasets, model as separate tables.
+
+**Key concepts:** Frozen vs non-frozen storage, element-level LWW, nested collection requirements, LIST anti-patterns, collection size limits.
+
+---
+
+## Appendix C: Learning Objectives & Exercises
+
+### Part 1 — Foundations (Modules 0-13)
+
+**Learning Objectives**
+
+After completing this part, you will be able to:
+- Explain how replication factor and consistency level interact to determine quorum requirements
+- Trace the write and read paths through a node, including memtable, commit log, and SSTable
+- Describe how hinted handoff and read repair restore consistency after transient node failures
+- Differentiate anti-entropy repair from read repair and explain when each applies
+- Predict the impact of tombstones on read performance and compaction behavior
+- Identify scenarios where Lightweight Transactions (LWT) are necessary and understand their cost
+
+**Review Questions**
+
+1. A cluster has RF=3 and you write at CL=QUORUM. How many nodes must acknowledge? (a) 1 (b) 2 (c) 3 (d) All replicas
+2. Which mechanism temporarily stores a write on behalf of an unreachable node? (a) Read repair (b) Anti-entropy repair (c) Hinted handoff (d) Compaction
+3. What is the primary risk of letting tombstones accumulate without running repair? (a) Token imbalance (b) Ghost reads of deleted data (c) Schema drift (d) Gossip timeouts
+4. LWT uses Paxos. What is the minimum participants for CAS with RF=3? (a) 1 (b) 2 (c) 3 (d) Depends on CL
+5. During a CL=QUORUM read, one replica returns a stale value. What happens? (a) Read fails (b) Stale replica removed (c) Background read repair triggered (d) Coordinator retries at CL=ONE
+
+**Hands-on Challenges**
+
+1. Kill one node, write 100 rows at CL=QUORUM, restart it, and use `nodetool tpstats` to confirm hints were delivered. Then run repair and verify consistency.
+2. Create a table with `gc_grace_seconds=60`, delete 10 rows, wait 90 seconds, trigger manual compaction. Observe SSTable counts before/after with `nodetool cfstats`.
+
+---
+
+### Part 2 — Advanced Failures (Modules 14-24)
+
+**Learning Objectives**
+
+After completing this part, you will be able to:
+- Identify symptoms of a ghost rack and schema disagreement, and how to recover
+- Describe what happens to reads and writes during a network partition
+- Configure and query a Storage-Attached Index (SAI) and explain its advantages over ALLOW FILTERING
+- Perform JSON insert/select operations and describe their serialization behavior
+- Interpret compaction metrics and explain when compaction falls behind
+
+**Review Questions**
+
+1. SAI differs from legacy 2i primarily because: (a) Separate process (b) Stored per-SSTable with range predicate support (c) Requires ALLOW FILTERING (d) Only indexes partition keys
+2. During a full partition between dc1 and dc2, a write at CL=LOCAL_QUORUM will: (a) Fail (b) Succeed if local DC has quorum (c) Block indefinitely (d) Downgrade to CL=ONE
+3. Schema disagreement most commonly results from: (a) Mismatched RF (b) A DDL not reaching all nodes (c) Compaction behind (d) Expired hints
+4. Which compaction strategy suits a workload with mostly INSERT and no updates? (a) STCS (b) LCS (c) TWCS (d) UCS
+5. A node appears DN in `nodetool status` but gossip shows UP. This suggests: (a) Ghost rack (b) Schema disagreement (c) Network partition (d) Hinted handoff overflow
+
+**Hands-on Challenges**
+
+1. Simulate a network partition between dc1 and dc2 using `docker network disconnect`, issue a write at CL=EACH_QUORUM, observe the failure, restore connectivity, and verify self-healing.
+2. Create a table with an SAI index on a non-PK column. Compare query latency with and without the index using `TRACING ON`.
+
+---
+
+### Part 3 — Operations (Modules 25-37)
+
+**Learning Objectives**
+
+After completing this part, you will be able to:
+- Enable and interpret CDC output for change stream processing
+- Configure audit logging and guardrails to prevent runaway queries
+- Select an appropriate compaction strategy based on workload access patterns
+- Execute a zero-downtime rolling restart and validate cluster health at each step
+- Design a backup and restore workflow using snapshots
+
+**Review Questions**
+
+1. CDC writes change records to: (a) A Kafka topic (b) The `cdc_raw` directory on each node (c) A CDC keyspace (d) The system log
+2. For time-series data deleted by time window, which compaction strategy minimizes read amplification? (a) STCS (b) LCS (c) TWCS (d) No compaction
+3. During a rolling restart with RF=3 and CL=QUORUM, writes will: (a) Fail (b) Succeed using remaining nodes (c) Block (d) Downgrade
+4. `nodetool snapshot` creates: (a) A full backup to object storage (b) Hard links to current SSTables (c) A schema export (d) A compressed tarball
+5. Guardrails can prevent: (a) Node failures (b) Unbounded IN clauses and full table scans (c) Schema disagreement (d) Compaction backlogs
+
+**Hands-on Challenges**
+
+1. Enable CDC on a table, insert 50 rows, then inspect the `cdc_raw` directory on node1 and identify the operation type for each mutation.
+2. Perform a rolling restart of all 6 nodes one at a time, draining each before restart. Time the full cycle and document any client-visible errors.
+
+---
+
+### Part 4 — Performance (Modules 38-42)
+
+**Learning Objectives**
+
+After completing this part, you will be able to:
+- Interpret `nodetool tpstats` output to identify thread pool saturation and dropped messages
+- Choose between incremental and full repair strategies based on cluster size
+- Run stress tests and interpret throughput and latency percentile output
+- Configure basic RBAC in HCD
+
+**Review Questions**
+
+1. `MutationStage` shows a large `Blocked` count. This indicates: (a) Network partition (b) Writes arriving faster than the node can process (c) Failing disk (d) Schema disagreement
+2. Incremental repair differs from full repair in that it: (a) Skips already-repaired SSTables (b) Only repairs locally (c) Runs automatically (d) Skips hints
+3. With 6 nodes and `num_tokens=16`, token ownership is: (a) Exactly equal (b) Approximately equal with variance (c) Determined by seed (d) Fixed at 1/6
+4. A super-user creates a role with `LOGIN=true` but no GRANTs. That role can: (a) Read all tables (b) Write system tables (c) Authenticate but access nothing (d) Access its own keyspace
+5. Which thread pool handles read requests? (a) MutationStage (b) ReadStage (c) GossipStage (d) CompactionExecutor
+
+**Hands-on Challenges**
+
+1. Run 500 writes at CL=QUORUM while monitoring `nodetool tpstats`. Identify which thread pools are active and whether any messages were dropped.
+2. Create a role `app_user` with login, grant SELECT on one keyspace, and verify it cannot write or read from another keyspace.
+
+---
+
+### Part 5 — Driver Policies (Modules 43-47)
+
+**Learning Objectives**
+
+After completing this part, you will be able to:
+- Explain how TokenAware routing reduces coordinator hops and improves latency
+- Configure speculative execution and describe the latency vs. resource trade-off
+- Implement DC-aware load balancing with failover
+- Select an appropriate retry policy for different failure modes
+
+**Review Questions**
+
+1. TokenAwarePolicy reduces latency by: (a) Caching results (b) Routing directly to partition-owning replicas (c) Bypassing the coordinator (d) Using persistent connections
+2. Speculative execution's main risk is: (a) Duplicate writes if not idempotent (b) Token imbalance (c) GC pressure (d) Schema conflicts
+3. A `WriteTimeoutException` at CL=QUORUM means: (a) Write definitely failed (b) Coordinator didn't get enough ACKs — write may or may not have applied (c) Row locked (d) Node down
+4. With `DCAwareRoundRobinPolicy(local_dc='dc1')` and all dc1 nodes unreachable: (a) Queries fail (b) Driver can fall back to dc2 (c) Retries indefinitely (d) Queued locally
+5. Which driver-demo.py subcommand demonstrates cross-DC failover? (a) token-aware (b) speculative (c) dc-failover (d) retry-policies
+
+**Hands-on Challenges**
+
+1. Run `driver-demo.py token-aware` with tracing enabled. Verify the coordinator is always a partition-owning replica for 10 queries.
+2. Stop all dc1 nodes and run `driver-demo.py dc-failover --local-dc dc1`. Observe failover to dc2, restart dc1, and verify rebalancing.
+
+---
+
+### Part 6 — Transactions (Modules 48-53)
+
+**Learning Objectives**
+
+After completing this part, you will be able to:
+- Articulate specific ACID guarantees HCD provides and where it deviates from RDBMS
+- Construct a logged batch and explain when it guarantees atomicity
+- Demonstrate the lost update problem and how LWT prevents it
+- Implement a saga pattern with compensating transactions
+- Apply the consistency decision framework to choose the right CL
+
+**Review Questions**
+
+1. A logged batch guarantees: (a) Full ACID isolation (b) Atomicity only — all or nothing, no isolation (c) Serializability (d) Durability across all replicas before returning
+2. The lost update problem occurs because: (a) Async writes (b) Read-then-write is not atomic (c) Compaction merges versions (d) Tombstones suppress old values
+3. `INSERT ... IF NOT EXISTS` uses which protocol? (a) Gossip (b) Paxos (c) Raft (d) Zab
+4. A compensating transaction in the saga pattern: (a) Rolls back to a snapshot (b) Applies a logical undo of a prior step (c) Locks rows (d) Uses LWT to verify
+5. For a financial debit that must never double-apply: (a) CL=ONE with retry (b) LWT with IF condition (c) CL=ALL (d) Logged batch at QUORUM
+
+**Hands-on Challenges**
+
+1. Reproduce the lost update: two concurrent sessions read a balance, compute, and write back. Verify the bug, then fix with LWT `UPDATE ... IF balance = X`.
+2. Implement a two-step saga (debit A, credit B). Deliberately fail step 2 and write a compensating transaction. Document account states at each stage.
+
+---
+
+### Part 7 — Enterprise (Modules 54-61)
+
+**Learning Objectives**
+
+After completing this part, you will be able to:
+- Interact with the HCD Data API using HTTP/REST for JSON document access
+- Design keyspace-level isolation for multi-tenant workloads
+- Execute a safe node decommission and verify token redistribution
+- Identify silent data corruption symptoms and how checksums and repair detect it
+- Analyze LWT contention metrics and apply mitigation strategies
+
+**Review Questions**
+
+1. The HCD Data API exposes data over: (a) Binary native protocol (b) REST/HTTP with JSON (c) gRPC (d) GraphQL
+2. Multi-tenant isolation at keyspace level provides: (a) Hardware isolation (b) Logical separation with independent RF/compaction (c) Encrypted inter-tenant traffic (d) Separate gossip rings
+3. `nodetool decommission` is safe when: (a) Node is seed (b) Enough replicas remain for RF (c) Zero pending hints (d) All repairs complete
+4. Silent data corruption is dangerous because: (a) Immediate crash (b) Incorrect values without error signal (c) Corrupts commitlog (d) Gossip instability
+5. High LWT contention is best reduced by: (a) Increasing RF (b) Partitioning contended rows (c) CL=ALL (d) Disabling speculative execution
+
+**Hands-on Challenges**
+
+1. Start the Data API (`make api`), use `curl` to insert 5 documents, retrieve with a filter, update one, and verify in cqlsh.
+2. Decommission node6, verify token redistribution with `nodetool status`, then recommission by starting a new container.
+
+---
+
+### Part 8 — Ops Deep-Dives (Modules 62-71)
+
+**Learning Objectives**
+
+After completing this part, you will be able to:
+- Configure RBAC roles with fine-grained permissions and verify enforcement
+- Explain how TDE protects data at rest and its key rotation process
+- Describe commitlog replay after a crash and what data can be lost
+- Predict behavior when hints expire before delivery and the resulting data gaps
+- Tune bloom filter false positive rates and cache sizes for read workloads
+
+**Review Questions**
+
+1. After a crash, HCD recovers in-flight writes by: (a) Re-reading hints (b) Replaying the commitlog (c) Full repair from seed (d) Reloading latest SSTable
+2. Default hint window is 3 hours. A 4-hour outage means: (a) Hints replayed (b) Gap must be closed by repair (c) Auto repair triggered (d) CL=ALL used
+3. A bloom filter false positive causes: (a) Write dropped (b) Unnecessary SSTable disk seek (c) Read repair triggered (d) Token reassignment
+4. ALTER KEYSPACE RF change takes effect: (a) Immediately (b) After repair completes redistribution (c) After restart (d) Only for new tables
+5. Materialized views carry consistency risk because: (a) Separate compaction (b) View updates applied asynchronously (c) Cannot query at QUORUM (d) Require LWT
+
+**Hands-on Challenges**
+
+1. Simulate crash recovery: `docker kill hcd-node3`, write 500 rows, restart node3, verify data present via `nodetool cfstats`.
+2. Adjust bloom filter `bloom_filter_fp_chance` from 0.01 to 0.1 on a table and measure the impact on SSTable read counts.
+
+---
+
+### Part 9 — DORA Ransomware (Modules 72-78)
+
+**Learning Objectives**
+
+After completing this part, you will be able to:
+- Map ransomware kill chain stages to a distributed database environment
+- Configure MinIO Object Lock in WORM mode and validate immutability
+- Implement commitlog archiving to immutable storage
+- Execute a ransomware attack simulation and measure RTO
+- Restore from WORM backups and validate data completeness
+- Assess cluster compliance against DORA requirements using the scorecard
+
+**Review Questions**
+
+1. WORM storage protects backups by: (a) Encrypting with rotating keys (b) Preventing deletion for a retention period (c) Replicating to a second cluster (d) MFA access
+2. In the attack simulation, the primary destructive operations are: (a) TRUNCATE + clearsnapshot (b) Commitlog corruption (c) Deleting gossip state (d) Removing seed config
+3. Commitlog archiving to WORM provides: (a) Point-in-time recovery beyond snapshots (b) Faster bootstrap (c) Auto compaction of archives (d) Cross-DC schema sync
+4. TRUNCATE in Cassandra: (a) Affects only one DC (b) Propagates to ALL replicas in ALL DCs (c) Creates tombstones (d) Is blocked by guardrails
+5. The DORA scorecard validates: (a) Only backup integrity (b) Backup immutability, RTO, DC failover, and audit trail (c) Network segmentation (d) Encryption standards
+
+**Hands-on Challenges**
+
+1. Take a snapshot, upload to MinIO WORM, attempt to delete before retention expires. Confirm deletion is rejected.
+2. Run the full ransomware simulation (module 75), record attack and restoration timestamps, compute actual RTO and compare against the DORA 2-hour threshold.
+
+---
+
+### Part 10 — Production Essentials (Modules 79-83)
+
+**Learning Objectives**
+
+After completing this part, you will be able to:
+- Explain the counter implementation and its consistency limitations
+- Use prepared statements to reduce parse overhead and prevent CQL injection
+- Identify GC pause patterns and apply JVM tuning to reduce stop-the-world events
+- Write partition-scoped CQL aggregation queries and understand coordinator-side cost
+- Choose the appropriate collection type (list, set, map, frozen) for a given requirement
+
+**Review Questions**
+
+1. Counter columns cannot mix with non-counter columns because: (a) Different compaction (b) Incompatible write paths (c) Require CL=ALL (d) Stored in separate keyspace
+2. Prepared statements improve performance by: (a) Caching results (b) Parsing once, reusing the plan (c) Compressing payloads (d) Bypassing coordinator
+3. A long GC pause causes other nodes to: (a) Mark it down immediately (b) Time out requests, generating TimeoutException (c) Trigger repair (d) Reroute to seed
+4. `SELECT COUNT(*) FROM large_table` is dangerous because: (a) Not supported (b) Requires CL=ALL (c) Coordinator aggregates all partitions, causing heap pressure (d) Locks the table
+5. A `frozen<map<text, text>>` differs from non-frozen in that: (a) Cannot be queried (b) Entire map must be rewritten to change any entry (c) Supports per-entry TTL (d) Stored off-heap
+
+**Hands-on Challenges**
+
+1. Create a counter table, perform 1000 increments, then query aggregated values. Verify counter accuracy after running `nodetool repair -pr`.
+2. Convert ad-hoc CQL in a Python script to use prepared statements. Benchmark 1000 executions with and without, and measure the p99 latency difference.
+
+---
+
+## Bibliography & References
+
+1. Ponemon Institute / Gartner (attributed). *Cost of Data Center Outages*. Ponemon Institute, 2014. The widely cited $5,600–$9,000 per minute downtime figure originates from this era of research.
+
+2. Sophos. *The State of Ransomware in Financial Services 2024*. Sophos Ltd., 2024. Reports that 65% of financial organizations were hit by ransomware.
+
+3. Veeam Software. *2024 Ransomware Trends Report: Lessons Learned from 1,200 Victims and Nearly 3,000 Cyberattacks*. Veeam, 2024. Reports that 96% of ransomware attacks targeted backup infrastructure.
+
+4. Reuters. *ICBC's U.S. Arm Hit by Ransomware Attack Disrupting Treasury Markets*. November 2023. LockBit ransomware struck ICBC's U.S. broker-dealer, forcing manual settlement of U.S. Treasury trades.
+
+5. European Parliament and Council. *Regulation (EU) 2022/2554 — Digital Operational Resilience Act (DORA)*. Official Journal of the European Union, 2022. In force from 17 January 2025. https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX%3A32022R2554
+
+6. Apache Software Foundation. *Apache Cassandra Documentation* (v4.x / v5.x). https://cassandra.apache.org/doc/latest/
+
+7. DataStax. *DataStax Python Driver for Apache Cassandra — Documentation*. https://docs.datastax.com/en/developer/python-driver/latest/
+
+8. K8ssandra Community. *K8ssandra Documentation: Kubernetes Operator for Apache Cassandra*. https://docs.k8ssandra.io/
+
+9. Carpenter, Jeff, and Eben Hewitt. *Cassandra: The Definitive Guide*, 3rd Edition. O'Reilly Media, 2022. ISBN 978-1-098-11054-3.
+
+10. DeCandia, Giuseppe, et al. "Dynamo: Amazon's Highly Available Key-Value Store." *ACM SIGOPS Operating Systems Review* 41(6), 2007. Foundational paper describing consistent hashing, hinted handoff, and eventual consistency.
+
+11. Brewer, Eric A. "Towards Robust Distributed Systems." Keynote, *ACM PODC*, 2000. Introduced the CAP conjecture; formally proved by Gilbert and Lynch (2002).
+
+12. Lamport, Leslie. "Paxos Made Simple." *ACM SIGACT News* 32(4), 2001. Foundational paper on Paxos consensus, which underlies Cassandra's LWT.
+
+13. DataStax / IBM. *HCD (Hyperledger Cassandra Distribution) Documentation and Release Notes*. https://docs.datastax.com/en/hcd/
+
+14. Abadi, Daniel. "Consistency Tradeoffs in Modern Distributed Database System Design." *IEEE Computer* 45(2), 2012. Introduces the PACELC model extending CAP.
+
+15. Veeam Software. *Immutable Backups and the 3-2-1-1-0 Rule*. Veeam, 2023. Best practices for ransomware-resistant backup strategies.
