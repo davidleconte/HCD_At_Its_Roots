@@ -114,12 +114,11 @@ readonly PART_NAMES=(
     "Advanced Failures"  # 18
     "Advanced Failures"  # 19
     "Advanced Failures"  # 20 (JSON Enterprise Patterns)
-    "Advanced Failures"  # 21
-    "Advanced Failures"  # 21
+    "Advanced Failures"  # 21 (Vector Search)
     "Advanced Failures"  # 22
     "Advanced Failures"  # 23
     "Advanced Failures"  # 24
-    "Operations"         # 25
+    "Advanced Failures"  # 25
     "Operations"         # 26
     "Operations"         # 27
     "Operations"         # 28
@@ -129,6 +128,7 @@ readonly PART_NAMES=(
     "Operations"         # 32
     "Operations"         # 33
     "Operations"         # 34
+    "Operations"         # 35
     "Operations"         # 35
     "Operations"         # 36
     "Operations"         # 37
@@ -8563,7 +8563,7 @@ run_module() {
             header 73 "DORA Ransomware — Kill Chain & Infrastructure Setup"
             echo -e "${C_BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${C_RESET}"
             echo -e "${C_BLUE}  PART 9: DORA RANSOMWARE RESILIENCE (Modules 73-79)${C_RESET}"
-            echo -e "${C_BLUE}  We survived 71 tests. Now an attacker encrypts every table,${C_RESET}"
+            echo -e "${C_BLUE}  We survived 73 modules. Now an attacker encrypts every table,${C_RESET}"
             echo -e "${C_BLUE}  wipes snapshots, and demands ransom. Watch what happens.${C_RESET}"
             echo -e "${C_BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${C_RESET}"
             echo ""

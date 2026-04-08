@@ -211,103 +211,104 @@ This demo uses a 6-node, multi-DC cluster simulated in Docker.
 | 16 | Gossip Protocol | HEARTBEAT, STATUS, DC/RACK live inspection |
 | 17 | Zombie Node (Network Partition) | Dynamic network name + interactive partition demo |
 | 18 | SAI (Storage Attached Indexing) | Interactive Q + composable multi-index AND queries |
-| 19 | Native JSON Ops | 13-part deep dive: basics + UDT nested docs, versioning, event sourcing, bulk perf, SAI composable queries |
-| 20 | Vector Search & AI Readiness | Compatibility guard + ANN similarity with fallback + RAG pipeline architecture |
-| 21 | Mixed Real-time Operations | Interactive Q + INSERT = UPDATE = mutation (LWW) |
-| 22 | Compaction | Interactive Q + SSTable merge resolves physical entropy |
-| 23 | Kill an Entire Datacenter (~5-8 min) | Zero data loss, LOCAL_QUORUM from dc2, RPO=0/RTO=seconds |
-| 24 | Grand Finale | Three cascading failures, full self-healing |
+| 19 | JSON Fundamentals | INSERT/SELECT JSON, DEFAULT UNSET, fromJson/toJson, collections, multi-format coexistence |
+| 20 | JSON Enterprise Patterns | UDT document modeling, versioning, event sourcing, bulk performance, SAI composable queries |
+| 21 | Vector Search & AI Readiness | Compatibility guard + ANN similarity with fallback + RAG pipeline architecture |
+| 22 | Mixed Real-time Operations | Interactive Q + INSERT = UPDATE = mutation (LWW) |
+| 23 | Compaction | Interactive Q + SSTable merge resolves physical entropy |
+| 24 | Kill an Entire Datacenter (~5-8 min) | Zero data loss, LOCAL_QUORUM from dc2, RPO=0/RTO=seconds |
+| 25 | Grand Finale | Three cascading failures, full self-healing |
 
 #### Part 3 — Operations (Modules 26-38)
 | Module | Title | Key Proof |
 |--------|-------|-----------|
-| 25 | CDC (Change Data Capture) | `strings` on raw CDC segments proves capture + Debezium/Kafka integration |
-| 26 | Audit Logging | Interactive Q + cassandra.yaml pre-check, multi-dir log search |
-| 27 | Guardrails | Interactive Q + batch size warning/failure thresholds |
-| 28 | Data Modeling Anti-Patterns | Interactive Q + 200 rows: hot partition vs bucketed + multi-tenancy patterns |
-| 29 | Latency Comparison | Side-by-side: CL=ONE vs LQ vs ALL extraction |
-| 30 | Time-Series Data Modeling | Compound keys, TTL, windowed queries |
-| 31 | Compaction Deep Dive | Interactive Q + 4 strategies (STCS/LCS/TWCS/UCS) |
-| 32 | Compression Strategies | Interactive Q + LZ4/Zstd/Snappy comparison |
-| 33 | Live Failover Under Load (~5 min) | 30 rows survive mid-stream node kill |
-| 34 | Multi-DC Write Conflict | Two strategies: parallel + USING TIMESTAMP |
-| 35 | Adding a Datacenter Live | Interactive Q + rebuild + multi-cloud mapping + chaos test (rebuild + 2 nodes down) |
-| 36 | Backup & Restore | Interactive Q + snapshot, truncate, restore, refresh |
-| 37 | Rolling Restart (~8-10 min) | All 3 nodes restarted (seed last), 20 writes succeed |
+| 26 | CDC (Change Data Capture) | `strings` on raw CDC segments proves capture + Debezium/Kafka integration |
+| 27 | Audit Logging | Interactive Q + cassandra.yaml pre-check, multi-dir log search |
+| 28 | Guardrails | Interactive Q + batch size warning/failure thresholds |
+| 29 | Data Modeling Anti-Patterns | Interactive Q + 200 rows: hot partition vs bucketed + multi-tenancy patterns |
+| 30 | Latency Comparison | Side-by-side: CL=ONE vs LQ vs ALL extraction |
+| 31 | Time-Series Data Modeling | Compound keys, TTL, windowed queries |
+| 32 | Compaction Deep Dive | Interactive Q + 4 strategies (STCS/LCS/TWCS/UCS) |
+| 33 | Compression Strategies | Interactive Q + LZ4/Zstd/Snappy comparison |
+| 34 | Live Failover Under Load (~5 min) | 30 rows survive mid-stream node kill |
+| 35 | Multi-DC Write Conflict | Two strategies: parallel + USING TIMESTAMP |
+| 36 | Adding a Datacenter Live | Interactive Q + rebuild + multi-cloud mapping + chaos test (rebuild + 2 nodes down) |
+| 37 | Backup & Restore | Interactive Q + snapshot, truncate, restore, refresh |
+| 38 | Rolling Restart (~8-10 min) | All 3 nodes restarted (seed last), 20 writes succeed |
 
 #### Part 4 — Performance (Modules 39-43)
 | Module | Title | Key Proof |
 |--------|-------|-----------|
-| 38 | Rate Limiting & Thread Pools | Grafana link + 500 parallel inserts move tpstats |
-| 39 | Repair Strategies | Interactive Q + pause/write/unpause creates real entropy + Reaper scheduling |
-| 40 | Stress Testing | 200 rows, bloom filter stats, latency histogram |
-| 41 | Security & Access Control | Syntax-only banner, RBAC + TLS keytool demo |
-| 42 | Geographic Visualization | LOCAL_QUORUM trace: zero WAN hops + GDPR data sovereignty patterns |
+| 39 | Rate Limiting & Thread Pools | Grafana link + 500 parallel inserts move tpstats |
+| 40 | Repair Strategies | Interactive Q + pause/write/unpause creates real entropy + Reaper scheduling |
+| 41 | Stress Testing | 200 rows, bloom filter stats, latency histogram |
+| 42 | Security & Access Control | Syntax-only banner, RBAC + TLS keytool demo |
+| 43 | Geographic Visualization | LOCAL_QUORUM trace: zero WAN hops + GDPR data sovereignty patterns |
 
 #### Part 5 — Driver Policies (Modules 44-48)
 | Module | Title | Key Proof |
 |--------|-------|-----------|
-| 43 | Driver Policies | TokenAwarePolicy: coordinator IS the replica |
-| 44 | Speculative Execution | Interactive Q + p99 drops to ~p50 with backup requests |
-| 45 | Live DC Failover with Driver (~3-5 min) | Zero errors during DC kill, RPO=0/RTO=1-3s |
-| 46 | Retry Policies Under Partition | pause+disconnect dual failure, 3 policies compared |
-| 47 | Parts 1-5 Checkpoint | Visual recap of Parts 1-5, key production takeaways |
+| 44 | Driver Policies | TokenAwarePolicy: coordinator IS the replica |
+| 45 | Speculative Execution | Interactive Q + p99 drops to ~p50 with backup requests |
+| 46 | Live DC Failover with Driver (~3-5 min) | Zero errors during DC kill, RPO=0/RTO=1-3s |
+| 47 | Retry Policies Under Partition | pause+disconnect dual failure, 3 policies compared |
+| 48 | Parts 1-5 Checkpoint | Visual recap of Parts 1-5, key production takeaways |
 
 #### Part 6 — Transactions & Patterns (Modules 49-54)
 | Module | Title | Key Proof |
 |--------|-------|-----------|
-| 48 | ACID vs HCD | Tunable consistency spectrum with traced latency |
-| 49 | LOGGED vs UNLOGGED BATCH | Batchlog overhead ~30%, crash recovery |
-| 50 | Lost Update Problem | LWT CAS prevents concurrent overwrites |
-| 51 | Banking: Instant Payment | LWT debit + CDC credit, money conserved + SOX/PCI-DSS/PSD2 compliance |
-| 52 | Saga Pattern: Order Flow | Compensating transactions release inventory |
-| 53 | Consistency Decision Framework | Decision tree, golden rules, evidence-based positioning framework |
+| 49 | ACID vs HCD | Tunable consistency spectrum with traced latency |
+| 50 | LOGGED vs UNLOGGED BATCH | Batchlog overhead ~30%, crash recovery |
+| 51 | Lost Update Problem | LWT CAS prevents concurrent overwrites |
+| 52 | Banking: Instant Payment | LWT debit + CDC credit, money conserved + SOX/PCI-DSS/PSD2 compliance |
+| 53 | Saga Pattern: Order Flow | Compensating transactions release inventory |
+| 54 | Consistency Decision Framework | Decision tree, golden rules, evidence-based positioning framework |
 
 #### Part 7 — Enterprise (Modules 55-62)
 | Module | Title | Key Proof |
 |--------|-------|-----------|
-| 54 | HCD Data API | REST/JSON document access via HTTP:8181, Postman collection, insertOne/find/update/delete |
-| 55 | Multi-Tenant Isolation | Tenant ID partition key, RBAC per tenant, GDPR erasure, DC affinity |
-| 56 | Node Decommission | Controlled shrink, drain+stop, data verification, decommission vs removenode vs assassinate |
-| 57 | Disaster Recovery Runbook | Coordinated multi-node snapshot, truncate+restore, commitlog archival, Medusa |
-| 58 | Silent Data Corruption | SSTable CRC corruption, nodetool verify/scrub detection, repair recovery |
-| 59 | Cross-Service Saga | Outbox pattern, payment timeout compensation, shipping failure refund, idempotency |
-| 60 | LWT Contention Under Load | 5 concurrent writers, Paxos 4-phase tracing, mitigation strategies |
-| 61 | Repair Deep-Dive | Merkle tree visualization, gc_grace zombie rows, 4 repair modes, production scheduling |
+| 55 | HCD Data API | REST/JSON document access via HTTP:8181, Postman collection, insertOne/find/update/delete |
+| 56 | Multi-Tenant Isolation | Tenant ID partition key, RBAC per tenant, GDPR erasure, DC affinity |
+| 57 | Node Decommission | Controlled shrink, drain+stop, data verification, decommission vs removenode vs assassinate |
+| 58 | Disaster Recovery Runbook | Coordinated multi-node snapshot, truncate+restore, commitlog archival, Medusa |
+| 59 | Silent Data Corruption | SSTable CRC corruption, nodetool verify/scrub detection, repair recovery |
+| 60 | Cross-Service Saga | Outbox pattern, payment timeout compensation, shipping failure refund, idempotency |
+| 61 | LWT Contention Under Load | 5 concurrent writers, Paxos 4-phase tracing, mitigation strategies |
+| 62 | Repair Deep-Dive | Merkle tree visualization, gc_grace zombie rows, 4 repair modes, production scheduling |
 
 #### Part 8 — Operational Deep-Dives (Modules 63-72)
 | Module | Title | Key Proof |
 |--------|-------|-----------|
-| 62 | Live RBAC Demo | PasswordAuthenticator, role creation, granular GRANT/REVOKE, permission denial, role inheritance |
-| 63 | Encryption at Rest (TDE) | Transparent data encryption config, encrypted SSTables (hexdump), key rotation workflow |
-| 64 | Commitlog Durability & Crash Recovery | docker kill (SIGKILL) crash, commitlog replay, zero data loss proof |
-| 65 | Hint Expiration & Data Gaps | Hint lifecycle, max_hint_window, expired hints → data gap, repair recovery |
-| 66 | Dynamic RF Change | ALTER KEYSPACE RF=1→3, empty replicas, QUORUM failure, repair to populate |
-| 67 | Streaming & Bootstrap Monitoring | netstats, bootstrap lifecycle, stream rate limiting, time estimation |
-| 68 | Materialized Views | Base table + MV, write-through, consistency risks, write amplification, production caveats |
-| 69 | Nodetool Ops Deep-Dive | tablestats, tpstats, proxyhistograms, compactionstats, troubleshooting decision tree |
-| 70 | Cross-DC Consistency Window | Network partition between DCs, LOCAL_QUORUM staleness, EACH_QUORUM trade-off |
-| 71 | Bloom Filter & Cache Tuning | bloom_filter_fp_chance, key cache hit ratio, row cache, chunk cache, FP trade-offs |
+| 63 | Live RBAC Demo | PasswordAuthenticator, role creation, granular GRANT/REVOKE, permission denial, role inheritance |
+| 64 | Encryption at Rest (TDE) | Transparent data encryption config, encrypted SSTables (hexdump), key rotation workflow |
+| 65 | Commitlog Durability & Crash Recovery | docker kill (SIGKILL) crash, commitlog replay, zero data loss proof |
+| 66 | Hint Expiration & Data Gaps | Hint lifecycle, max_hint_window, expired hints → data gap, repair recovery |
+| 67 | Dynamic RF Change | ALTER KEYSPACE RF=1→3, empty replicas, QUORUM failure, repair to populate |
+| 68 | Streaming & Bootstrap Monitoring | netstats, bootstrap lifecycle, stream rate limiting, time estimation |
+| 69 | Materialized Views | Base table + MV, write-through, consistency risks, write amplification, production caveats |
+| 70 | Nodetool Ops Deep-Dive | tablestats, tpstats, proxyhistograms, compactionstats, troubleshooting decision tree |
+| 71 | Cross-DC Consistency Window | Network partition between DCs, LOCAL_QUORUM staleness, EACH_QUORUM trade-off |
+| 72 | Bloom Filter & Cache Tuning | bloom_filter_fp_chance, key cache hit ratio, row cache, chunk cache, FP trade-offs |
 
 #### Part 9 — DORA Ransomware Resilience (Modules 73-79)
 | Module | Title | Key Proof |
 |--------|-------|-----------|
-| 72 | DORA Ransomware — Kill Chain & Infrastructure Setup | Ransomware kill chain, DORA quiz, dora_bank keyspace, MinIO WORM bucket creation with Object Lock COMPLIANCE |
-| 73 | Backup to WORM & Integrity | nodetool snapshot on all nodes, upload to MinIO WORM, SHA-256 integrity verification, deletion attempt blocked by Object Lock |
-| 74 | Commitlog Archiving to WORM | commitlog_archiving.properties, WAL segment archiving, two-tier WORM (snapshots + commitlogs), PITR explanation |
-| 75 | The Attack Simulation | 5-phase ransomware: recon, exfil, TRUNCATE all tables, clearsnapshot --all, ransom note — WORM backups survive |
-| 76 | Recovery from WORM Backups | Integrity verification, SSTable restore from WORM, data verification (5 accounts, 4 transactions), DC2 consistency check |
-| 77 | DC Failover Under Attack | dc1 network partition (3 nodes disconnected), dc2 serves at LOCAL_QUORUM, writes during partition, repair reconvergence |
-| 78 | DORA Compliance Scorecard & K8s | DORA article mapping (Art. 6,9-13,19,26), Art. 19 incident reporting timeline, 5 recovery paths matrix, K8ssandra CRD + auto-healing |
+| 73 | DORA Ransomware — Kill Chain & Infrastructure Setup | Ransomware kill chain, DORA quiz, dora_bank keyspace, MinIO WORM bucket creation with Object Lock COMPLIANCE |
+| 74 | Backup to WORM & Integrity | nodetool snapshot on all nodes, upload to MinIO WORM, SHA-256 integrity verification, deletion attempt blocked by Object Lock |
+| 75 | Commitlog Archiving to WORM | commitlog_archiving.properties, WAL segment archiving, two-tier WORM (snapshots + commitlogs), PITR explanation |
+| 76 | The Attack Simulation | 5-phase ransomware: recon, exfil, TRUNCATE all tables, clearsnapshot --all, ransom note — WORM backups survive |
+| 77 | Recovery from WORM Backups | Integrity verification, SSTable restore from WORM, data verification (5 accounts, 4 transactions), DC2 consistency check |
+| 78 | DC Failover Under Attack | dc1 network partition (3 nodes disconnected), dc2 serves at LOCAL_QUORUM, writes during partition, repair reconvergence |
+| 79 | DORA Compliance Scorecard & K8s | DORA article mapping (Art. 6,9-13,19,26), Art. 19 incident reporting timeline, 5 recovery paths matrix, K8ssandra CRD + auto-healing |
 
 #### Part 10 — Production Essentials (Modules 80-84)
 | Module | Title | Key Proof |
 |--------|-------|-----------|
-| 79 | Counter Columns | Non-idempotent counters, dedicated counter tables, increment/decrement, counter repair |
-| 80 | Prepared Statements & Driver Best Practices | Parse-once execute-many, connection pooling, idempotency flags, driver anti-patterns |
-| 81 | JVM & GC Tuning | Heap sizing rules, GC stats, compressed oops, off-heap memory, production tuning checklist |
-| 82 | CQL Aggregation & Analytics Functions | COUNT, SUM, AVG, MIN, MAX, GROUP BY, coordinator-side aggregation, UDA, Spark integration |
-| 83 | Collection Types Deep-Dive | SET, LIST, MAP, frozen vs non-frozen, partial updates, concurrent semantics, nested collections |
+| 80 | Counter Columns | Non-idempotent counters, dedicated counter tables, increment/decrement, counter repair |
+| 81 | Prepared Statements & Driver Best Practices | Parse-once execute-many, connection pooling, idempotency flags, driver anti-patterns |
+| 82 | JVM & GC Tuning | Heap sizing rules, GC stats, compressed oops, off-heap memory, production tuning checklist |
+| 83 | CQL Aggregation & Analytics Functions | COUNT, SUM, AVG, MIN, MAX, GROUP BY, coordinator-side aggregation, UDA, Spark integration |
+| 84 | Collection Types Deep-Dive | SET, LIST, MAP, frozen vs non-frozen, partial updates, concurrent semantics, nested collections |
 
 ## Cleanup
 
@@ -2051,14 +2052,14 @@ The highest-impact modules for executive presentations, ordered by audience reac
 
 | # | Module | What You Show | Time |
 |---|--------|---------------|------|
-| 1 | 23 | Kill an entire datacenter. Query from the other. Zero data loss. | ~5-8 min |
-| 2 | 45 | Driver auto-failover: zero application errors during DC kill | ~3-5 min |
-| 3 | 24 | Chain 3 cascading failures, prove self-healing after each | ~10 min |
-| 4 | 51 | Cross-partition banking transfer: money always conserved | ~5 min |
+| 1 | 24 | Kill an entire datacenter. Query from the other. Zero data loss. | ~5-8 min |
+| 2 | 46 | Driver auto-failover: zero application errors during DC kill | ~3-5 min |
+| 3 | 25 | Chain 3 cascading failures, prove self-healing after each | ~10 min |
+| 4 | 52 | Cross-partition banking transfer: money always conserved | ~5 min |
 | 5 | 17 | Network partition: watch gossip detect a zombie node live | ~3 min |
 | 6 | 2 | EACH_QUORUM fails, LOCAL_QUORUM survives, then EACH_QUORUM recovers | ~3 min |
 | 7 | 12 | Two users, two continents, one seat — LWT prevents double-booking | ~2 min |
-| 8 | 35 | Add a datacenter live and watch data stream in real-time | ~8 min |
+| 8 | 36 | Add a datacenter live and watch data stream in real-time | ~8 min |
 
 ### Framing for Business Audiences
 
@@ -2243,7 +2244,7 @@ After completing this part, you will be able to:
 
 ---
 
-### Part 2 — Advanced Failures (Modules 14-24)
+### Part 2 — Advanced Failures (Modules 14-25)
 
 **Learning Objectives**
 
@@ -2269,7 +2270,7 @@ After completing this part, you will be able to:
 
 ---
 
-### Part 3 — Operations (Modules 25-37)
+### Part 3 — Operations (Modules 26-38)
 
 **Learning Objectives**
 
@@ -2295,7 +2296,7 @@ After completing this part, you will be able to:
 
 ---
 
-### Part 4 — Performance (Modules 38-42)
+### Part 4 — Performance (Modules 39-43)
 
 **Learning Objectives**
 
@@ -2320,7 +2321,7 @@ After completing this part, you will be able to:
 
 ---
 
-### Part 5 — Driver Policies (Modules 43-47)
+### Part 5 — Driver Policies (Modules 44-48)
 
 **Learning Objectives**
 
@@ -2345,7 +2346,7 @@ After completing this part, you will be able to:
 
 ---
 
-### Part 6 — Transactions (Modules 48-53)
+### Part 6 — Transactions (Modules 49-54)
 
 **Learning Objectives**
 
@@ -2371,7 +2372,7 @@ After completing this part, you will be able to:
 
 ---
 
-### Part 7 — Enterprise (Modules 54-61)
+### Part 7 — Enterprise (Modules 55-62)
 
 **Learning Objectives**
 
@@ -2397,7 +2398,7 @@ After completing this part, you will be able to:
 
 ---
 
-### Part 8 — Ops Deep-Dives (Modules 62-71)
+### Part 8 — Ops Deep-Dives (Modules 63-72)
 
 **Learning Objectives**
 
@@ -2423,7 +2424,7 @@ After completing this part, you will be able to:
 
 ---
 
-### Part 9 — DORA Ransomware (Modules 72-78)
+### Part 9 — DORA Ransomware (Modules 73-79)
 
 **Learning Objectives**
 
@@ -2450,7 +2451,7 @@ After completing this part, you will be able to:
 
 ---
 
-### Part 10 — Production Essentials (Modules 79-83)
+### Part 10 — Production Essentials (Modules 80-84)
 
 **Learning Objectives**
 
