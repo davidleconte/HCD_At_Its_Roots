@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Dockerized multi-node IBM HCD (Hyperledger Cassandra Distribution) cluster for development, testing, and demos. Runs a 6-node cluster across 2 datacenters (dc1: nodes 1-3, dc2: nodes 4-6) on a single machine using Docker Compose with static IPs on a `172.28.0.0/24` bridge network.
+Dockerized multi-node IBM HCD (Hyper-Converged Database) cluster for development, testing, and demos. Runs a 6-node cluster across 2 datacenters (dc1: nodes 1-3, dc2: nodes 4-6) on a single machine using Docker Compose with static IPs on a `172.28.0.0/24` bridge network.
 
 **Prerequisite:** `hcd-1.2.3-bin.tar.gz` must be placed in the project root before building.
 

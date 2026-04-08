@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
+from __future__ import annotations
+
 import argparse
 import ipaddress
 import os
 import sys
 import tempfile
 
-def parse_datacenters(dc_str):
+def parse_datacenters(dc_str: str) -> list[tuple[str, int]]:
     """Parses 'dc1:2,dc2:3' into [('dc1', 2), ('dc2', 3)]"""
     try:
         dcs = []
@@ -19,11 +21,11 @@ def parse_datacenters(dc_str):
     except ValueError:
         raise argparse.ArgumentTypeError('Datacenters must be in format name:count,name:count')
 
-def get_input(prompt, default):
+def get_input(prompt: str, default: str) -> str:
     value = input(f"{prompt} [{default}]: ").strip()
     return value if value else default
 
-def generate_topology(nodes_count, cluster_name="HCDCluster", dcs=None, subnet="172.28.0.0/24"):
+def generate_topology(nodes_count: int, cluster_name: str = "HCDCluster", dcs: list[tuple[str, int]] | None = None, subnet: str = "172.28.0.0/24") -> str:
     """Generate a docker-compose.yml string for an HCD cluster.
 
     Args:

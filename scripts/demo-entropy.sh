@@ -501,7 +501,7 @@ run_module() {
             separator
             echo -e "${C_WHITE}--- Why IBM HCD, Not Just Apache Cassandra? ---${C_RESET}"
             echo ""
-            echo "  HCD (Hyperledger Cassandra Distribution) is IBM's enterprise distribution"
+            echo "  HCD (Hyper-Converged Database) is IBM's enterprise distribution"
             echo "  of Apache Cassandra. Everything you learn here applies to open-source"
             echo "  Cassandra, but HCD adds critical enterprise capabilities:"
             echo ""
@@ -1616,6 +1616,14 @@ run_module() {
             # =====================================================================
             # ENTERPRISE PATTERNS (Parts 9-13)
             # =====================================================================
+
+            echo ""
+            echo -e "${C_MAGENTA}--- Module 19 Midpoint: JSON Basics Complete ---${C_RESET}"
+            echo -e "${C_MAGENTA}Parts 1-8 covered: INSERT/SELECT JSON, DEFAULT UNSET, WHERE clauses,${C_RESET}"
+            echo -e "${C_MAGENTA}fromJson()/toJson(), nested access, and multi-format coexistence.${C_RESET}"
+            echo -e "${C_MAGENTA}Parts 9-13 ahead: UDTs, versioning, event sourcing, bulk perf, SAI+JSON.${C_RESET}"
+            echo ""
+            pause
 
             separator
             echo -e "${C_WHITE}--- Part 9: UDT + Nested JSON (Document Modeling) ---${C_RESET}"
@@ -4469,8 +4477,8 @@ run_module() {
             echo "  │  - Audit logging (Module 26) proves data access compliance       │"
             echo "  └─────────────────────────────────────────────────────────────────┘"
             echo ""
-            echo "  In our demo cluster, dc1=eu-west and dc2=us-east. The tracing proof"
-            echo "  above shows that LOCAL_QUORUM reads from dc1 NEVER touch dc2 nodes."
+            echo "  In production, you would map dc1=eu-west and dc2=us-east. The tracing"
+            echo "  proof above shows LOCAL_QUORUM reads NEVER touch the other DC's nodes."
             echo "  This is how enterprises pass GDPR audits with HCD."
             echo ""
 
@@ -4826,7 +4834,7 @@ run_module() {
             echo -e "${C_CYAN}║  Security:   RBAC, Audit, Guardrails, CDC                          ║${C_RESET}"
             echo -e "${C_CYAN}║  Modeling:   Anti-patterns, Time-series, Tombstones                 ║${C_RESET}"
             echo -e "${C_CYAN}║  Driver:     TokenAware, Speculative, DC Failover, Retry Policies  ║${C_RESET}"
-            echo -e "${C_CYAN}║  Txns:       ACID model, Batches, LWT patterns, Sagas, Banking     ║${C_RESET}"
+            echo -e "${C_CYAN}║  LWT:        Paxos CAS, IF NOT EXISTS (intro, deep-dive in Part 6) ║${C_RESET}"
             echo -e "${C_CYAN}║                                                                    ║${C_RESET}"
             echo -e "${C_CYAN}╠══════════════════════════════════════════════════════════════════════╣${C_RESET}"
             echo -e "${C_CYAN}║  KEY PRODUCTION TAKEAWAYS:                                         ║${C_RESET}"

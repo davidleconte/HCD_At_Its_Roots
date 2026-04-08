@@ -10,6 +10,7 @@ Usage:
 
 Runs inside the HCD container via: docker exec hcd-nodeN driver-demo <subcommand>
 """
+from __future__ import annotations
 
 import argparse
 import math
@@ -35,23 +36,23 @@ except ImportError:
 
 # ─── Shared Helpers ──────────────────────────────────────────────────
 
-def parse_contact_points(cp_str):
+def parse_contact_points(cp_str: str) -> list[str]:
     return [s.strip() for s in cp_str.split(",")]
 
 
-def ensure_table(session, table_ddl):
+def ensure_table(session: object, table_ddl: str) -> None:
     session.execute(table_ddl)
 
 
-def ip_to_dc(ip):
-    """Map container IPs to DC names for display."""
+def ip_to_dc(ip: str) -> str:
+    """Map container IPs to DC names for display (assumes default 172.28.0.x subnet)."""
     last_octet = int(ip.split(".")[-1])
     if last_octet <= 4:
         return "dc1"
     return "dc2"
 
 
-def print_coordinator_summary(coordinators):
+def print_coordinator_summary(coordinators: list[str]) -> None:
     """Print a histogram of coordinator usage."""
     counts = {}
     for ip in coordinators:
@@ -65,7 +66,7 @@ def print_coordinator_summary(coordinators):
 
 # ─── Subcommand 1: token-aware ──────────────────────────────────────
 
-def cmd_token_aware(args):
+def cmd_token_aware(args: argparse.Namespace) -> None:
     contact_points = parse_contact_points(args.contact_points)
     ks = args.keyspace
 
@@ -150,7 +151,7 @@ def cmd_token_aware(args):
 
 # ─── Subcommand 2: speculative ──────────────────────────────────────
 
-def cmd_speculative(args):
+def cmd_speculative(args: argparse.Namespace) -> None:
     contact_points = parse_contact_points(args.contact_points)
     ks = args.keyspace
     use_speculative = args.enable_speculative
@@ -225,7 +226,7 @@ def cmd_speculative(args):
 
 # ─── Subcommand 3: dc-failover ──────────────────────────────────────
 
-def cmd_dc_failover(args):
+def cmd_dc_failover(args: argparse.Namespace) -> None:
     contact_points = parse_contact_points(args.contact_points)
     ks = args.keyspace
     duration = args.duration
@@ -349,7 +350,7 @@ class AggressiveRetryPolicy(RetryPolicy):
         return self.RETHROW, None
 
 
-def cmd_retry_policies(args):
+def cmd_retry_policies(args: argparse.Namespace) -> None:
     contact_points = parse_contact_points(args.contact_points)
     ks = args.keyspace
     policy_name = args.policy
@@ -426,7 +427,7 @@ def cmd_retry_policies(args):
 
 # ─── Main ────────────────────────────────────────────────────────────
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(
         description="DataStax Python Driver demo for HCD Entropy modules."
     )

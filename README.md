@@ -1,6 +1,6 @@
 # HCD Docker Cluster
 
-This project provides a Dockerized environment for running a multi-node IBM Hyperledger Cassandra (HCD) cluster. It is designed for development and testing purposes.
+This project provides a Dockerized environment for running a multi-node IBM HCD (Hyper-Converged Database) cluster. It is designed for development and testing purposes.
 
 ## Prerequisites
 

@@ -1,10 +1,12 @@
+# Pin by digest for reproducibility: docker pull eclipse-temurin:11-jre && docker inspect --format='{{index .RepoDigests 0}}' eclipse-temurin:11-jre
+# Then replace the FROM line with: FROM eclipse-temurin:11-jre@sha256:<digest>
 FROM eclipse-temurin:11-jre
 
 LABEL maintainer="HCD Docker Cluster" \
       description="IBM HCD multi-node cluster for development and demos" \
       version="1.2.3" \
       org.opencontainers.image.title="HCD Docker Cluster" \
-      org.opencontainers.image.description="IBM Hyperledger Cassandra Distribution - multi-node cluster for development, testing, and demos" \
+      org.opencontainers.image.description="IBM HCD (Hyper-Converged Database) - multi-node cluster for development, testing, and demos" \
       org.opencontainers.image.vendor="IBM" \
       org.opencontainers.image.source="https://github.com/davidleconte/HCD_At_Its_Roots"
 
@@ -25,6 +27,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Install uv and setup Python environment
+# Pin by digest for reproducibility: docker pull ghcr.io/astral-sh/uv:0.5.14 && docker inspect --format='{{index .RepoDigests 0}}' ghcr.io/astral-sh/uv:0.5.14
 COPY --from=ghcr.io/astral-sh/uv:0.5.14 /uv /bin/uv
 ENV UV_PYTHON_INSTALL_DIR=/opt/python
 ENV VIRTUAL_ENV=/opt/venv

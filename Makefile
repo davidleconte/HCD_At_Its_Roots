@@ -52,7 +52,7 @@ demo-score: ## Validate all 84 modules (dry-run scorecard)
 demo-ransomware: ## Run DORA ransomware demo (modules 72-78)
 	@for m in 72 73 74 75 76 77 78; do ./scripts/demo-entropy.sh $$m; done
 
-demo-part: ## Run a demo part (1-9): make demo-part P=3
+demo-part: ## Run a demo part (1-10): make demo-part P=3
 	@case "$(P)" in \
 		1) for m in $$(seq 0 13);  do ./scripts/demo-entropy.sh $$m; done ;; \
 		2) for m in $$(seq 14 24); do ./scripts/demo-entropy.sh $$m; done ;; \
@@ -63,9 +63,10 @@ demo-part: ## Run a demo part (1-9): make demo-part P=3
 		7) for m in $$(seq 54 61); do ./scripts/demo-entropy.sh $$m; done ;; \
 		8) for m in $$(seq 62 71); do ./scripts/demo-entropy.sh $$m; done ;; \
 		9) for m in $$(seq 72 78); do ./scripts/demo-entropy.sh $$m; done ;; \
-		*) echo "Usage: make demo-part P=N (where N is 1-9)" >&2; \
-		   echo "  1=Foundations  2=Failures  3=Operations  4=Performance  5=Drivers" >&2; \
-		   echo "  6=Transactions 7=Enterprise 8=Deep-Dives 9=DORA" >&2; exit 1 ;; \
+		10) for m in $$(seq 79 83); do ./scripts/demo-entropy.sh $$m; done ;; \
+		*) echo "Usage: make demo-part P=N (where N is 1-10)" >&2; \
+		   echo "  1=Foundations   2=Failures    3=Operations  4=Performance  5=Drivers" >&2; \
+		   echo "  6=Transactions  7=Enterprise  8=Deep-Dives  9=DORA        10=Production" >&2; exit 1 ;; \
 	esac
 
 minio: ## Start MinIO WORM storage (S3-compatible)

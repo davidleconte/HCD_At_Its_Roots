@@ -17,7 +17,7 @@
 
 ### Who This Book Is For
 
-This handbook is for **database engineers, architects, SREs, and technical decision-makers** evaluating or operating IBM HCD (Hyperledger Cassandra Distribution) in production. It assumes basic familiarity with relational databases and Linux command-line tools. No prior Cassandra experience is required — Part 1 builds from first principles.
+This handbook is for **database engineers, architects, SREs, and technical decision-makers** evaluating or operating IBM HCD (Hyper-Converged Database) in production. It assumes basic familiarity with relational databases and Linux command-line tools. No prior Cassandra experience is required — Part 1 builds from first principles.
 
 **If you are a:**
 - **Database engineer** — you will learn HCD internals through hands-on experiments that reveal how distributed consensus, replication, and repair actually work under the hood.
@@ -318,7 +318,7 @@ make destroy     # or: docker compose down -v
 
 ## Module 0: Introduction & Cluster Status
 
-The opening module verifies the cluster is healthy, introduces the 6-node, 2-DC topology, and presents a 9-part roadmap of the entire demo.
+The opening module verifies the cluster is healthy, introduces the 6-node, 2-DC topology, and presents a 10-part roadmap of the entire demo.
 
 ### 10-Part Roadmap
 - **Part 1 — Foundations** (Modules 0-13): Replication, consistency levels, hinted handoff, read repair, anti-entropy repair
@@ -1829,145 +1829,217 @@ The capstone module presents four sections with pauses between each for discussi
 
 ## Module 54: HCD Data API (REST/JSON Document Access)
 
-Demonstrates the HCD Data API running on `http://localhost:8181`, providing REST/JSON access to Cassandra data without CQL. Uses a Postman collection with CRUD operations: `insertOne`, `find`, `updateOne`, `deleteOne`. Shows document-style access patterns alongside traditional CQL, proving HCD supports both relational and document paradigms.
+Demonstrates the HCD Data API, an HTTP/JSON service running on `http://localhost:8181` that provides document-style CRUD access without CQL. Walks through a 6-step workflow: create namespace, create collection, `insertOne`/`insertMany`, `find` with MongoDB-style filter operators (`$lt`, `$gt`, `$in`), `findOneAndUpdate` with `$set`, and `deleteOne`. A comparison table contrasts the Data API against native CQL across 8 criteria.
 
-**What to look for:** HTTP 200 responses for all CRUD operations. The Data API translates JSON documents to/from Cassandra tables transparently. Compare latency of REST vs native CQL.
+**What to look for:** Each HTTP response returns `status.ok: 1` for namespace/collection creation and `insertedIds` confirming auto-generated document IDs. Filters like `{"price": {"$lt": 1200}}` return matching documents without any schema definition. `findOneAndUpdate` with `$set` modifies only specified fields.
+
+**Takeaway:** The Data API removes the CQL driver dependency entirely, letting web and mobile developers access HCD through familiar REST/JSON patterns. It adds HTTP overhead compared to the native binary protocol, so use CQL for high-throughput and latency-critical paths.
+
+**Key concepts:** REST/JSON document API, MongoDB-style filter operators, schema-free collections, namespace-to-keyspace mapping, Data API vs CQL trade-offs.
 
 ---
 
-## Module 55: Multi-Tenant Isolation
+## Module 55: Multi-Tenant Isolation (End-to-End)
 
-Shows how to design multi-tenant applications on HCD using tenant ID as partition key prefix, RBAC roles per tenant, GDPR-compliant data erasure (DELETE WHERE tenant_id = X), and DC affinity for data sovereignty.
+Shows three isolation patterns and implements the recommended approach — `tenant_id` as partition key prefix — with a live 3-tenant demo (`acme-corp`, `globex-inc`, `initech`). Covers SAI index on `status`, partition-level isolation, RBAC syntax for per-tenant roles, guardrail thresholds for noisy-neighbor protection, GDPR Article 17 erasure via `DELETE WHERE tenant_id = X`, and DC-affinity patterns for premium tiers.
 
-**What to look for:** Each tenant's data is isolated at the partition level. RBAC prevents cross-tenant access. GDPR erasure removes all data for a single tenant without affecting others.
+**What to look for:** `SELECT WHERE tenant_id = 'acme-corp'` returns exactly 3 rows with zero cross-tenant leakage. After `DELETE WHERE tenant_id = 'initech'`, a follow-up query returns zero rows — all initech data is gone without touching other tenants.
+
+**Takeaway:** Placing `tenant_id` in the partition key gives physical data isolation, efficient queries, and GDPR erasure with a single DELETE — all without separate keyspaces. Layer RBAC for database-enforced access control.
+
+**Key concepts:** Partition-key isolation, SAI index on non-key columns, GDPR Article 17 erasure, per-tenant RBAC roles, DC affinity for tiered multi-tenancy.
 
 ---
 
 ## Module 56: Node Decommission (Controlled Cluster Shrink)
 
-Walks through safe node removal: `nodetool drain` (stop accepting writes), `nodetool decommission` (stream data to remaining nodes), and verification. Compares `decommission` (graceful) vs `removenode` (node already dead) vs `assassinate` (force-remove from gossip).
+Demonstrates graceful node removal: pre-decommission checklist, `nodetool drain` (flushes memtables, stops writes), simulated node stop, and verification that all 20 test rows remain readable at LOCAL_QUORUM. Compares three removal methods: `decommission` (node alive, streams data out), `removenode` (node dead, others re-stream), and `assassinate` (force-remove from gossip, data loss possible). Restarts node6 after the demo.
 
-**What to look for:** Decommission streams all data off the node before it leaves the ring. `nodetool status` shows the node transitioning from UN to UL (Leaving) to gone.
+**What to look for:** During drain + stop, `nodetool status` shows node6 transitioning to DN. All 20 test rows return successfully at LOCAL_QUORUM from the remaining 5 nodes. `getendpoints` shows token range ownership shifting.
+
+**Takeaway:** Always run `nodetool repair -pr` before decommissioning to ensure the node has the latest data to stream. `decommission` > `removenode` > `assassinate` — use the gentlest method. Never decommission a seed node without first updating the seed list.
+
+**Key concepts:** nodetool drain, nodetool decommission, removenode vs assassinate, token range redistribution, seed node precautions.
 
 ---
 
 ## Module 57: Disaster Recovery Runbook
 
-Demonstrates a 4-level DR strategy: (1) `nodetool snapshot` for point-in-time backups, (2) coordinated multi-node snapshots, (3) `truncate` + restore from snapshot, (4) commitlog archival for RPO=0. References Medusa for production-grade automated backups to cloud storage.
+Builds a complete 4-level DR procedure: (1) coordinated parallel snapshots across all 6 nodes, (2) TRUNCATE to simulate data loss (count drops to 0), (3) restore by copying SSTable files back + `nodetool refresh` (no restart needed), (4) post-restore validation with `nodetool verify` and `nodetool repair`. Covers DR maturity levels, RPO impact, commitlog archival for PITR, and Medusa for production automation.
 
-**What to look for:** Snapshot creates hard links (instant, zero-copy). Restore from snapshot + commitlog replay recovers to the exact pre-failure state.
+**What to look for:** Parallel snapshot creation completes almost instantly (hard links). After TRUNCATE, `count(*) = 0`. After `nodetool refresh`, count returns to 15. `nodetool verify` reports no corruption, and repair ensures cross-replica consistency.
+
+**Takeaway:** Coordinate snapshots across ALL nodes — a single-node backup is incomplete. The restore sequence: copy SSTables → `nodetool refresh` → `nodetool verify` → `nodetool repair`. Use Medusa in production to automate this flow.
+
+**Key concepts:** Coordinated multi-node snapshots, nodetool refresh (live SSTable load), nodetool verify (CRC32 integrity), DR maturity levels, Medusa backup tool, PITR.
 
 ---
 
 ## Module 58: Silent Data Corruption Detection
 
-Injects corruption into an SSTable's `Data.db` file using `dd` with random bytes, then detects it with `nodetool verify` (CRC32 scan) and `nodetool scrub` (row-level rebuild). Demonstrates recovery via `nodetool repair` from healthy replicas (majority wins with RF=3).
+Injects realistic disk corruption using `dd if=/dev/urandom` to overwrite bytes in an SSTable `Data.db` file. Demonstrates three detection methods: `nodetool verify` (CRC32 scan, non-destructive), `nodetool scrub` (row-level rebuild, discards unreadable rows), and direct read (triggers checksum mismatch). Recovers all corrupted rows via `nodetool repair` using majority-wins Merkle tree comparison across RF=3 replicas.
 
-**What to look for:** `nodetool verify` reports the corrupted SSTable path. After `scrub` + `repair`, all 10 test rows are restored from healthy replicas.
+**What to look for:** `nodetool verify` reports the corrupted SSTable file path without modifying data. After `scrub`, the SSTable is rebuilt. After `repair`, all 10 rows are restored — the two healthy replicas provide majority-wins correction.
+
+**Takeaway:** Disk sectors fail silently — CRC32 checksums in every SSTable are HCD's first detection line. Schedule weekly `nodetool verify` runs. With RF=3, repair restores correct data as long as the majority (2 of 3) replicas are healthy.
+
+**Key concepts:** SSTable CRC32 checksums, nodetool verify, nodetool scrub, majority-wins Merkle tree repair, disk_failure_policy.
 
 ---
 
 ## Module 59: Cross-Service Saga (Simulated External Services)
 
-Extends the saga pattern from Modules 51-52 to cross-service transactions spanning Order, Payment, and Shipping services. Demonstrates happy path (5-step lifecycle), payment timeout with compensation, and post-capture shipping failure with refund. Uses the outbox pattern for reliable event delivery and LWT for idempotent step execution.
+Extends the saga pattern from Modules 51-52 across three simulated services (Order, Payment, Shipping) using an HCD-backed state table and outbox table. Runs three scenarios: (1) happy path (5-step lifecycle: CREATED → COMPLETED), (2) payment timeout with compensating cancellation, (3) shipping failure after capture with automatic refund. LWT `IF NOT EXISTS` on every step guarantees idempotency.
 
-**What to look for:** Three saga scenarios with different outcomes. Replaying a completed step returns `[applied]: False` (idempotency). All outbox events are generated atomically with state changes.
+**What to look for:** Happy path shows all 5 steps and 3 outbox events. Timeout scenario shows compensation steps (CANCELLED + VOIDED). Replaying step 2 returns `[applied]: False` — the IF NOT EXISTS guard prevents duplicates.
+
+**Takeaway:** HCD provides the persistence layer (state + outbox atomically), CDC delivers outbox events to downstream services, and LWT enforces idempotency. The outbox pattern solves the dual-write problem.
+
+**Key concepts:** Saga state table, outbox pattern, dual-write problem, LWT IF NOT EXISTS (idempotency), compensating transactions, CDC for event delivery.
 
 ---
 
 ## Module 60: LWT Contention Under Load
 
-Launches 5 concurrent LWT writers targeting the same row to demonstrate Paxos contention. Compares single-writer baseline (zero retries) with concurrent contention (only 1 winner per round). Uses `TRACING ON` to show the 4-phase Paxos round-trip cost vs normal writes. Covers mitigation strategies: partition sharding, exponential backoff, application queuing.
+Demonstrates Paxos contention: single-writer baseline (10 sequential LWT updates, all succeed) then 5 concurrent writers targeting the same row — only 1 wins per round. Uses `TRACING ON` to compare the 4-phase Paxos round-trip against a normal write, proving 4-10x latency overhead. Covers mitigation strategies and explains why LWT is an anti-pattern for rate limiting.
 
-**What to look for:** Single-writer: all 10 updates succeed immediately. Concurrent: only 1 of 5 writers wins. LWT trace shows Prepare/Promise/Propose/Commit phases (4x round-trips vs 1 for normal writes).
+**What to look for:** Single-writer: all 10 updates succeed with zero retries. Concurrent: only 1 of 5 wins per round. LWT trace shows Prepare, Promise, Propose, Commit phases. Total coordinator time is 4-10x higher than normal writes.
+
+**Takeaway:** LWT throughput per partition is ~100-1000 ops/sec regardless of cluster size — Paxos is single-leader per partition. Use partition sharding to spread contention. Replace LWT rate limiters with Redis/Valkey for high-throughput use cases.
+
+**Key concepts:** Paxos 4-phase consensus, [applied]: False retry loop, LWT throughput ceiling, partition sharding, LWT anti-patterns.
 
 ---
 
 ## Module 61: Repair Deep-Dive (The Most Critical Ops Procedure)
 
-Goes beyond Module 39's repair basics: visualizes Merkle trees, demonstrates the zombie row problem (deleted data resurrected after gc_grace expiry), and compares 4 repair modes (full, primary-range, incremental, sub-range). Creates deliberate entropy by stopping a node during writes, then repairs it. Covers gc_grace_seconds interaction and Reaper scheduling for production.
+Goes beyond Module 39's basics to explain why repair is mandatory (zombie row problem), how Merkle trees minimize I/O (O(log N) divergence detection), and demonstrates all four repair modes. Creates deliberate entropy by stopping node3, writing 20 rows it misses, restarting, proving the count mismatch, then running repair to close the gap. Covers `gc_grace_seconds` interaction and Reaper scheduling.
 
-**What to look for:** Node3 shows fewer rows than Node1 after the outage. After repair, counts match. Repair history visible in `system_distributed.repair_history`.
+**What to look for:** After the outage, `CONSISTENCY ONE; SELECT count(*)` on node3 returns fewer rows than node1 — this is the entropy. After `nodetool repair`, counts match. `system_distributed.repair_history` records the completed repair.
+
+**Takeaway:** Repair is the only mechanism preventing zombie rows — deleted data resurrected when a stale replica rejoins after `gc_grace_seconds` expires. Run primary-range repair (`-pr`) within 70% of `gc_grace_seconds` (7 days for the 10-day default).
+
+**Key concepts:** Zombie row problem, gc_grace_seconds, Merkle tree O(log N) detection, four repair modes (full/primary-range/incremental/sub-range), Reaper scheduling.
 
 ---
 
 ## Module 62: Live RBAC Demo (Role-Based Access Control)
 
-Demonstrates HCD's authentication and authorization: PasswordAuthenticator, role creation (`CREATE ROLE`), granular permissions (`GRANT SELECT/MODIFY`), permission denial, and role inheritance. Shows the full privilege hierarchy from superuser to read-only analyst roles.
+Demonstrates HCD's full authentication and authorization stack: creates three roles (`role_read`, `role_write`, `role_admin`) with different privileges, grants granular `SELECT`, `MODIFY`, and `ALL` permissions, shows the permission matrix, and demonstrates role inheritance. Covers three authentication tiers: AllowAllAuthenticator (dev), PasswordAuthenticator (production), and AdvancedAuthenticator (LDAP/OIDC).
 
-**What to look for:** Each role has precisely scoped permissions. Unauthorized operations are denied with clear error messages. Role inheritance allows hierarchical access models.
+**What to look for:** `LIST ALL PERMISSIONS OF role_read` shows only SELECT. `role_app` inherits both read and write after GRANT. Permission denial examples clearly state which permission is missing and on which resource.
+
+**Takeaway:** Production HCD must enable PasswordAuthenticator + CassandraAuthorizer — dev defaults allow unrestricted access. Apply least privilege: if credentials are compromised, damage is limited to the granted scope.
+
+**Key concepts:** PasswordAuthenticator, CassandraAuthorizer, GRANT/REVOKE, role inheritance, least-privilege principle, LDAP/OIDC federation.
 
 ---
 
 ## Module 63: Encryption at Rest (Transparent Data Encryption)
 
-Shows TDE configuration: JKS/JCEKS keystore setup, `AES/CBC/PKCS5Padding` cipher, encrypted SSTable verification via `hexdump` (random bytes vs plaintext), and key rotation workflow using `nodetool upgradesstables`.
+Explains TDE's protection scope (SSTables, commitlogs, hints — not in-flight or in-memory), presents the configuration for `AES/CBC/PKCS5Padding` with JKS/JCEKS keystore, and demonstrates encrypted vs unencrypted SSTables via `hexdump` and `strings`. Covers the 5-step online key rotation workflow and typical performance overhead (5-15% latency with AES-NI).
 
-**What to look for:** Encrypted SSTables show random bytes in hexdump (no readable text). Key rotation re-encrypts all SSTables with the new key without downtime.
+**What to look for:** Without TDE, `hexdump` shows readable patterns and `strings` extracts row values. With TDE, the same commands return random bytes. Key rotation re-encrypts all SSTables without downtime via `nodetool upgradesstables`.
+
+**Takeaway:** TDE protects against physical disk theft and backup exfiltration — not against a compromised application. Pair TDE (at-rest) with TLS (in-flight) and RBAC (access control) for defense in depth.
+
+**Key concepts:** Transparent Data Encryption, JKS/JCEKS keystore, AES/CBC/PKCS5Padding, encryption scope, online key rotation, AES-NI acceleration.
 
 ---
 
 ## Module 64: Commitlog Durability & Crash Recovery
 
-Uses `docker kill` (SIGKILL) to simulate an unclean process crash after writing data. Demonstrates that commitlog replay on restart recovers all committed writes with zero data loss. Compares `commitlog_sync: periodic` (default, 10s window) vs `batch` (fsync per write, slower but durable).
+Traces the full write-path durability flow (commitlog append → memtable → ACK → async flush → segment recycled). Demonstrates crash recovery by writing 20 rows, hard-killing node3 with `docker kill` (SIGKILL), restarting, and proving the row count is identical. Contrasts `commitlog_sync: periodic` (10s window) against `batch` (fsync per write, zero loss, ~2x latency).
 
-**What to look for:** After SIGKILL + restart, all rows written before the crash are present. The commitlog replay message appears in startup logs.
+**What to look for:** Row count on node3 before `docker kill` matches after restart — commitlog replay appears in startup logs. `docker stop` (SIGTERM) triggers graceful flush and does NOT need replay.
+
+**Takeaway:** Every write is durably committed to the commitlog before the client ACK — HCD survives SIGKILL without data loss. Use `commitlog_sync=batch` for zero-loss financial workloads; accept `periodic` mode's 10-second window if your SLA permits.
+
+**Key concepts:** Write-ahead log (WAL), SIGKILL vs SIGTERM semantics, commitlog_sync modes, memtable flush lifecycle, segment recycling.
 
 ---
 
 ## Module 65: Hint Expiration & Data Gaps
 
-Demonstrates the hinted handoff lifecycle: stops a node, writes data that generates hints on the coordinator, then shows hint delivery on restart. Explains `max_hint_window_in_ms` (3 hours default) — if a node is down longer, hints expire and data gaps require repair.
+Demonstrates the complete hinted handoff lifecycle: stops node3, writes 10 rows (hints stored on coordinator), checks pending hints via `nodetool tpstats`, restarts node3, and verifies all 10 rows arrive through automatic hint delivery. Explains the expiry scenario: outages exceeding `max_hint_window_in_ms` (3 hours) create a data gap only repair can fix.
 
-**What to look for:** Hints are stored on the coordinator while the target is down. After restart, `nodetool handoffwindow` or system.hints shows hint delivery. For outages > 3 hours, repair is mandatory.
+**What to look for:** After node3 stops, `tpstats` HintedHandoff shows pending entries. After restart, `CONSISTENCY ONE; SELECT count(*)` on node3 returns 10 — confirming delivery. The expiry diagram shows hints from hours 0-3 deliver but writes from hours 3-4 are silently dropped.
+
+**Takeaway:** Hints are an optimization for short outages (under 3 hours), not a durability guarantee. For any outage exceeding `max_hint_window`, a data gap exists until `nodetool repair -pr` runs. This is why scheduled repair is mandatory.
+
+**Key concepts:** Hinted handoff lifecycle, max_hint_window_in_ms (3h default), hint expiry and data gaps, repair as mandatory recovery path.
 
 ---
 
 ## Module 66: Dynamic RF Change (ALTER KEYSPACE)
 
-Changes replication factor from RF=1 to RF=3 via `ALTER KEYSPACE` and demonstrates that this is metadata-only — new replicas are empty until `nodetool repair` populates them. Shows that QUORUM reads fail on empty replicas until repair completes.
+Demonstrates that `ALTER KEYSPACE` is metadata-only — it changes RF in the schema but does NOT stream data. Creates `rf_change_demo` at RF=1, inserts 10 rows, alters to RF=3. Shows `nodetool describering` reports 3 endpoints immediately but new replicas are empty. Proves QUORUM reads can fail or return inconsistent data. Runs repair to populate new replicas.
 
-**What to look for:** After ALTER KEYSPACE, `nodetool describering` shows new token assignments but new replicas have zero data. QUORUM reads may fail. After repair, all replicas have consistent data.
+**What to look for:** After ALTER, `describering` lists 3 endpoints per range, but QUORUM reads may return wrong counts. After `nodetool repair`, QUORUM reads consistently return 10 rows. RF decrease would require `nodetool cleanup`.
+
+**Takeaway:** Always follow `ALTER KEYSPACE` immediately with `nodetool repair` to populate new replicas. Perform RF changes during maintenance windows. Never set RF higher than the number of nodes per datacenter.
+
+**Key concepts:** ALTER KEYSPACE (metadata-only), empty new replicas, nodetool repair to populate, nodetool cleanup after RF decrease.
 
 ---
 
 ## Module 67: Streaming & Bootstrap Monitoring
 
-Walks through the bootstrap lifecycle when a new node joins: token allocation, streaming from existing nodes, and monitoring via `nodetool netstats`. Covers `stream_throughput_outbound_megabits_per_sec` (200 Mbps default) for rate limiting.
+Explains the 8-step bootstrap lifecycle and demonstrates key monitoring commands: `nodetool netstats` (active stream sessions with progress), `nodetool compactionstats` (compaction from received SSTables), `nodetool status` (UJ → UN transitions). Covers stream rate limiting via `stream_throughput_outbound_megabits_per_sec` (200 Mbps default) and dynamic adjustment with `nodetool setstreamthroughput`.
 
-**What to look for:** `nodetool netstats` shows active streams with progress percentages. Stream throughput can be adjusted to avoid saturating the network during bootstrap.
+**What to look for:** In an idle cluster, `nodetool netstats` shows zero active streams. `nodetool setstreamthroughput 50` immediately limits outbound streaming to 50 Mbps without restart. After bootstrap, status transitions from `UJ` to `UN`.
+
+**Takeaway:** Streaming is the data transfer mechanism for bootstrap, repair, decommission, and expansion — all use the same pipeline. Rate limiting protects production traffic. Always run `nodetool cleanup` on existing nodes after a new node joins.
+
+**Key concepts:** Bootstrap lifecycle (UJ → UN), nodetool netstats, stream throughput rate limiting, setstreamthroughput, nodetool cleanup after scale-out.
 
 ---
 
 ## Module 68: Materialized Views (Write-Through Consistency)
 
-Creates a base table and materialized view, demonstrating write-through semantics (MV updates automatically on base table writes). Shows the 2x+ write amplification cost, consistency risks (MV can silently diverge from base), and the production caveat that the only fix for a diverged MV is `DROP` + `CREATE`.
+Creates `users_base` (partitioned by `user_id`) and MV `users_by_dept` (partitioned by `dept`) to demonstrate write-through semantics. Shows write amplification (every base write triggers an MV mutation), consistency risk (MV can silently lag), and the drastic recovery path (only fix for a drifted MV is DROP + CREATE). Compares MVs against manual denormalization across 6 risk dimensions.
 
-**What to look for:** MV rows appear automatically after base table inserts. Write amplification is visible in `nodetool tablestats` (MV receives same write volume as base table).
+**What to look for:** After inserting into `users_base`, `users_by_dept WHERE dept = 'Engineering'` returns employees immediately. `nodetool tablestats` shows the MV receives roughly the same write count as the base table (write amplification ~2x).
+
+**Takeaway:** MVs eliminate application-managed denormalization for low-to-moderate write volumes, but add hidden write amplification and can silently diverge. For high-volume or SLA-critical workloads, prefer explicit application-managed denormalization.
+
+**Key concepts:** MV write-through, write amplification (2x per MV), eventual MV consistency risk, DROP + CREATE rebuild, manual denormalization alternative.
 
 ---
 
 ## Module 69: Nodetool Ops Deep-Dive (Troubleshooting Toolkit)
 
-Covers the essential nodetool commands for production troubleshooting: `tablestats` (per-table metrics), `tpstats` (thread pool activity), `proxyhistograms` (coordinator-level latency distribution), and `compactionstats` (pending compactions). Presents a troubleshooting decision tree for common production issues.
+Systematic walkthrough of five essential commands: `tablestats` (per-table p99, SSTable count, bloom FP ratio), `tpstats` (Active/Pending/Blocked/Dropped per stage), `proxyhistograms` (coordinator p50/p99/p999), `compactionstats` (live progress + pending count), `info` (heap, uptime, cache hit ratios). Closes with a troubleshooting decision tree mapping symptoms to diagnostic sequences.
 
-**What to look for:** Each command reveals different operational metrics. The decision tree maps symptoms (high latency, dropped messages, pending compactions) to diagnostic commands and remediation steps.
+**What to look for:** In a healthy cluster, `tpstats` shows zero Pending and zero Blocked. Any non-zero Blocked count is a red flag. The decision tree: slow reads → `proxyhistograms` → `tpstats` → `tablestats` → `compactionstats`.
+
+**Takeaway:** A 4-command workflow — proxyhistograms, tpstats, tablestats, compactionstats — narrows most production root causes in under 5 minutes without touching data.
+
+**Key concepts:** tablestats, tpstats, proxyhistograms, compactionstats, troubleshooting decision tree.
 
 ---
 
 ## Module 70: Cross-DC Consistency Window
 
-Uses `docker network disconnect` to partition dc2 from dc1, then demonstrates that LOCAL_QUORUM reads in dc1 succeed but return stale data when dc2 has newer writes. Shows EACH_QUORUM as the cross-DC consistency guarantee (at the cost of higher latency and reduced availability).
+Uses `docker network disconnect` to partition all three dc2 nodes, writes 10 rows in dc1 at LOCAL_QUORUM while dc2 is isolated. Shows dc1 reaches 15 rows while dc2 stays at 5 — this is the consistency window. Reconnects dc2, demonstrates CONSISTENCY ALL triggering read repair to close the gap. Compares consistency levels by DC scope and cross-DC guarantee.
 
-**What to look for:** During partition, LOCAL_QUORUM in dc1 succeeds but may miss dc2 writes. EACH_QUORUM fails during partition (by design — it requires both DCs). After reconnection, data converges.
+**What to look for:** During partition, LOCAL_QUORUM writes in dc1 succeed immediately. After reconnection, `CONSISTENCY ALL` forces all 6 replicas to respond — dc2's stale replicas are read-repaired to 15 rows. Window duration = partition time until first repair/read-repair.
+
+**Takeaway:** LOCAL_QUORUM is per-datacenter — cross-DC replication is asynchronous. During a partition, the remote DC sees stale data. After healing, hints and read repair close the window. EACH_QUORUM provides true cross-DC consistency but adds WAN latency.
+
+**Key concepts:** Asynchronous cross-DC replication, consistency window, LOCAL_QUORUM vs EACH_QUORUM, network partition simulation, read repair after healing.
 
 ---
 
 ## Module 71: Bloom Filter & Cache Tuning
 
-Creates tables with different `bloom_filter_fp_chance` settings (0.001, 0.01, 0.1) and compares memory usage via `nodetool tablestats`. Explains the trade-off: lower FP chance = larger bloom filters in memory = fewer wasted disk reads. Covers key cache, row cache, and chunk cache hit ratios.
+Creates three tables with different `bloom_filter_fp_chance` values (0.01, 0.1, 0.5), inserts 50 rows, flushes to SSTables, and compares bloom filter sizes via `nodetool tablestats`. Presents the FP trade-off (0.001 = ~15 bits/key, 0.01 = ~10 bits/key, 0.1 = ~5 bits/key). Covers key cache (partition key → disk position, target > 85% hit), row cache (disabled by default), and chunk cache (off-heap, automatic).
 
-**What to look for:** Tables with lower `bloom_filter_fp_chance` show larger bloom filter sizes in `tablestats`. The FP trade-off table shows ~15 bits/key at 0.001 vs ~10 bits/key at 0.01 (default).
+**What to look for:** `SELECT bloom_filter_fp_chance FROM system_schema.tables` confirms different settings. `nodetool tablestats` shows larger bloom filter memory for tighter (lower FP) tables. `nodetool info` reports key cache hit ratio — production should show > 85%.
+
+**Takeaway:** Bloom filters are the first check on every SSTable read — false positives waste disk I/O, true negatives skip SSTables entirely. Tune aggressively for latency-critical read-heavy tables, relax for write-heavy tables. Key cache is almost always beneficial; row cache is rarely worth enabling.
+
+**Key concepts:** bloom_filter_fp_chance, bits-per-key calculation, key cache, row cache (mutation-invalidated), chunk cache (off-heap).
 
 ---
 
@@ -2428,7 +2500,7 @@ After completing this part, you will be able to:
 
 12. Lamport, Leslie. "Paxos Made Simple." *ACM SIGACT News* 32(4), 2001. Foundational paper on Paxos consensus, which underlies Cassandra's LWT.
 
-13. DataStax / IBM. *HCD (Hyperledger Cassandra Distribution) Documentation and Release Notes*. https://docs.datastax.com/en/hcd/
+13. DataStax / IBM. *HCD (Hyper-Converged Database) Documentation and Release Notes*. https://docs.datastax.com/en/hcd/
 
 14. Abadi, Daniel. "Consistency Tradeoffs in Modern Distributed Database System Design." *IEEE Computer* 45(2), 2012. Introduces the PACELC model extending CAP.
 
