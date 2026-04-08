@@ -203,7 +203,7 @@ This demo uses a 6-node, multi-DC cluster simulated in Docker.
 | 12 | Lightweight Transactions | Paxos IF NOT EXISTS prevents double-booking |
 | 13 | Summary & Health Check | Schema agreement, all nodes UN |
 
-#### Part 2 — Advanced Failures (Modules 14-24)
+#### Part 2 — Advanced Failures (Modules 14-25)
 | Module | Title | Key Proof |
 |--------|-------|-----------|
 | 14 | Ghost Rack (Double Rack Failure) | Interactive: "Can the cluster serve reads?" |
@@ -218,7 +218,7 @@ This demo uses a 6-node, multi-DC cluster simulated in Docker.
 | 23 | Kill an Entire Datacenter (~5-8 min) | Zero data loss, LOCAL_QUORUM from dc2, RPO=0/RTO=seconds |
 | 24 | Grand Finale | Three cascading failures, full self-healing |
 
-#### Part 3 — Operations (Modules 25-37)
+#### Part 3 — Operations (Modules 26-38)
 | Module | Title | Key Proof |
 |--------|-------|-----------|
 | 25 | CDC (Change Data Capture) | `strings` on raw CDC segments proves capture + Debezium/Kafka integration |
@@ -235,7 +235,7 @@ This demo uses a 6-node, multi-DC cluster simulated in Docker.
 | 36 | Backup & Restore | Interactive Q + snapshot, truncate, restore, refresh |
 | 37 | Rolling Restart (~8-10 min) | All 3 nodes restarted (seed last), 20 writes succeed |
 
-#### Part 4 — Performance (Modules 38-42)
+#### Part 4 — Performance (Modules 39-43)
 | Module | Title | Key Proof |
 |--------|-------|-----------|
 | 38 | Rate Limiting & Thread Pools | Grafana link + 500 parallel inserts move tpstats |
@@ -244,7 +244,7 @@ This demo uses a 6-node, multi-DC cluster simulated in Docker.
 | 41 | Security & Access Control | Syntax-only banner, RBAC + TLS keytool demo |
 | 42 | Geographic Visualization | LOCAL_QUORUM trace: zero WAN hops + GDPR data sovereignty patterns |
 
-#### Part 5 — Driver Policies (Modules 43-47)
+#### Part 5 — Driver Policies (Modules 44-48)
 | Module | Title | Key Proof |
 |--------|-------|-----------|
 | 43 | Driver Policies | TokenAwarePolicy: coordinator IS the replica |
@@ -253,7 +253,7 @@ This demo uses a 6-node, multi-DC cluster simulated in Docker.
 | 46 | Retry Policies Under Partition | pause+disconnect dual failure, 3 policies compared |
 | 47 | Parts 1-5 Checkpoint | Visual recap of Parts 1-5, key production takeaways |
 
-#### Part 6 — Transactions & Patterns (Modules 48-53)
+#### Part 6 — Transactions & Patterns (Modules 49-54)
 | Module | Title | Key Proof |
 |--------|-------|-----------|
 | 48 | ACID vs HCD | Tunable consistency spectrum with traced latency |
@@ -263,7 +263,7 @@ This demo uses a 6-node, multi-DC cluster simulated in Docker.
 | 52 | Saga Pattern: Order Flow | Compensating transactions release inventory |
 | 53 | Consistency Decision Framework | Decision tree, golden rules, evidence-based positioning framework |
 
-#### Part 7 — Enterprise (Modules 54-61)
+#### Part 7 — Enterprise (Modules 55-62)
 | Module | Title | Key Proof |
 |--------|-------|-----------|
 | 54 | HCD Data API | REST/JSON document access via HTTP:8181, Postman collection, insertOne/find/update/delete |
@@ -275,7 +275,7 @@ This demo uses a 6-node, multi-DC cluster simulated in Docker.
 | 60 | LWT Contention Under Load | 5 concurrent writers, Paxos 4-phase tracing, mitigation strategies |
 | 61 | Repair Deep-Dive | Merkle tree visualization, gc_grace zombie rows, 4 repair modes, production scheduling |
 
-#### Part 8 — Operational Deep-Dives (Modules 62-71)
+#### Part 8 — Operational Deep-Dives (Modules 63-72)
 | Module | Title | Key Proof |
 |--------|-------|-----------|
 | 62 | Live RBAC Demo | PasswordAuthenticator, role creation, granular GRANT/REVOKE, permission denial, role inheritance |
@@ -289,7 +289,7 @@ This demo uses a 6-node, multi-DC cluster simulated in Docker.
 | 70 | Cross-DC Consistency Window | Network partition between DCs, LOCAL_QUORUM staleness, EACH_QUORUM trade-off |
 | 71 | Bloom Filter & Cache Tuning | bloom_filter_fp_chance, key cache hit ratio, row cache, chunk cache, FP trade-offs |
 
-#### Part 9 — DORA Ransomware Resilience (Modules 72-78)
+#### Part 9 — DORA Ransomware Resilience (Modules 73-79)
 | Module | Title | Key Proof |
 |--------|-------|-----------|
 | 72 | DORA Ransomware — Kill Chain & Infrastructure Setup | Ransomware kill chain, DORA quiz, dora_bank keyspace, MinIO WORM bucket creation with Object Lock COMPLIANCE |
@@ -300,7 +300,7 @@ This demo uses a 6-node, multi-DC cluster simulated in Docker.
 | 77 | DC Failover Under Attack | dc1 network partition (3 nodes disconnected), dc2 serves at LOCAL_QUORUM, writes during partition, repair reconvergence |
 | 78 | DORA Compliance Scorecard & K8s | DORA article mapping (Art. 6,9-13,19,26), Art. 19 incident reporting timeline, 5 recovery paths matrix, K8ssandra CRD + auto-healing |
 
-#### Part 10 — Production Essentials (Modules 79-83)
+#### Part 10 — Production Essentials (Modules 80-84)
 | Module | Title | Key Proof |
 |--------|-------|-----------|
 | 79 | Counter Columns | Non-idempotent counters, dedicated counter tables, increment/decrement, counter repair |
@@ -324,15 +324,15 @@ The opening module verifies the cluster is healthy, introduces the 6-node, 2-DC 
 
 ### 10-Part Roadmap
 - **Part 1 — Foundations** (Modules 0-13): Replication, consistency levels, hinted handoff, read repair, anti-entropy repair
-- **Part 2 — Advanced Failures** (Modules 14-24): Ghost rack, zombie node, network partition, SAI, vector search, DC kill
-- **Part 3 — Operations** (Modules 25-37): CDC, audit logging, guardrails, data modeling, compaction, compression, backup/restore
-- **Part 4 — Performance** (Modules 38-42): Stress testing, rate limiting, thread pools
-- **Part 5 — Driver Policies** (Modules 43-47): Token-aware routing, speculative execution, DC failover, retry policies
-- **Part 6 — Transactions & Patterns** (Modules 48-53): ACID model, batches, LWT, saga patterns, decision framework
-- **Part 7 — Enterprise** (Modules 54-61): HCD Data API, multi-tenant isolation, node decommission, disaster recovery, silent data corruption, cross-service saga, LWT contention, repair deep-dive
-- **Part 8 — Operational Deep-Dives** (Modules 62-71): RBAC, encryption at rest, commitlog crash recovery, hint expiration, dynamic RF change, streaming, materialized views, nodetool ops, cross-DC consistency, bloom filter & cache tuning
-- **Part 9 — DORA Ransomware Resilience** (Modules 72-78): Kill chain, WORM backups (MinIO Object Lock), commitlog archiving, ransomware attack simulation, recovery from WORM, DC failover under attack, DORA compliance scorecard, K8ssandra auto-healing
-- **Part 10 — Production Essentials** (Modules 79-83): Counter columns, prepared statements, JVM/GC tuning, CQL aggregations, collection types deep-dive
+- **Part 2 — Advanced Failures** (Modules 14-25): Ghost rack, zombie node, network partition, SAI, JSON, vector search, DC kill
+- **Part 3 — Operations** (Modules 26-38): CDC, audit logging, guardrails, data modeling, compaction, compression, backup/restore
+- **Part 4 — Performance** (Modules 39-43): Stress testing, rate limiting, thread pools
+- **Part 5 — Driver Policies** (Modules 44-48): Token-aware routing, speculative execution, DC failover, retry policies
+- **Part 6 — Transactions & Patterns** (Modules 49-54): ACID model, batches, LWT, saga patterns, decision framework
+- **Part 7 — Enterprise** (Modules 55-62): HCD Data API, multi-tenant isolation, node decommission, disaster recovery, silent data corruption, cross-service saga, LWT contention, repair deep-dive
+- **Part 8 — Operational Deep-Dives** (Modules 63-72): RBAC, encryption at rest, commitlog crash recovery, hint expiration, dynamic RF change, streaming, materialized views, nodetool ops, cross-DC consistency, bloom filter & cache tuning
+- **Part 9 — DORA Ransomware Resilience** (Modules 73-79): Kill chain, WORM backups (MinIO Object Lock), commitlog archiving, ransomware attack simulation, recovery from WORM, DC failover under attack, DORA compliance scorecard, K8ssandra auto-healing
+- **Part 10 — Production Essentials** (Modules 80-84): Counter columns, prepared statements, JVM/GC tuning, CQL aggregations, collection types deep-dive
 
 ### What You'll Learn
 - How to verify cluster health with `nodetool status`

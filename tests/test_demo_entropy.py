@@ -97,7 +97,7 @@ def test_combined_flags():
 
 
 def test_score_mode():
-    """Verify --score flag runs scorecard and reports 84/84 pass."""
+    """Verify --score flag runs scorecard and reports 85/85 pass."""
     result = run_demo("--score")
     assert result.returncode == 0
     assert "85" in result.stdout and ("85/85" in result.stdout or "Score:  100%" in result.stdout), \
