@@ -1,7 +1,7 @@
 # To pin by digest for reproducible builds, run: make pin-digests
 # This will update this file with the current digest automatically.
 # FORMAT: FROM eclipse-temurin:11-jre@sha256:<digest>
-FROM eclipse-temurin:11-jre
+FROM eclipse-temurin:25-jre
 
 LABEL maintainer="HCD Docker Cluster" \
       description="IBM HCD multi-node cluster for development and demos" \
