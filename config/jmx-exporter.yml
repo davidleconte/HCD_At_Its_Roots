@@ -51,3 +51,25 @@ rules:
     name: cassandra_cache_$2
     labels:
       cache: $1
+
+  # JVM GC metrics (Module 81)
+  - pattern: 'java.lang<type=GarbageCollector, name=(.*)><>CollectionCount'
+    name: jvm_gc_collection_count
+    labels:
+      gc: $1
+
+  - pattern: 'java.lang<type=GarbageCollector, name=(.*)><>CollectionTime'
+    name: jvm_gc_collection_time_ms
+    labels:
+      gc: $1
+
+  # JVM memory
+  - pattern: 'java.lang<type=Memory><HeapMemoryUsage>(\w+)'
+    name: jvm_memory_heap_$1_bytes
+
+  - pattern: 'java.lang<type=Memory><NonHeapMemoryUsage>(\w+)'
+    name: jvm_memory_nonheap_$1_bytes
+
+  # Streaming metrics (Module 67)
+  - pattern: 'org.apache.cassandra.metrics<type=Streaming, name=(.*)><>Count'
+    name: cassandra_streaming_$1

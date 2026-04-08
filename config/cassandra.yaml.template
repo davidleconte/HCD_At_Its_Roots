@@ -86,5 +86,37 @@ page_size_warn_threshold: 5000
 page_size_fail_threshold: -1
 read_before_write_list_operations_enabled: true
 
+# Authentication & Authorization — Modules 41, 62
+# Uncomment to enable RBAC. Default: AllowAllAuthenticator (no auth required).
+# authenticator: PasswordAuthenticator
+# authorizer: CassandraAuthorizer
+# role_manager: CassandraRoleManager
+# roles_validity_in_ms: 2000
+# permissions_validity_in_ms: 2000
+
+# Internode Encryption — Module 63
+# Uncomment to enable TLS between nodes. Requires keystore/truststore setup.
+# server_encryption_options:
+#     internode_encryption: all
+#     keystore: /opt/hcd/resources/cassandra/conf/.keystore
+#     keystore_password: cassandra
+#     truststore: /opt/hcd/resources/cassandra/conf/.truststore
+#     truststore_password: cassandra
+
+# Client-to-Node Encryption — Module 63
+# Uncomment to require TLS for CQL connections.
+# client_encryption_options:
+#     enabled: true
+#     keystore: /opt/hcd/resources/cassandra/conf/.keystore
+#     keystore_password: cassandra
+#     require_client_auth: false
+
+# Transparent Data Encryption (TDE) — Module 63
+# Uncomment to encrypt SSTables at rest. Requires cipher and key provider config.
+# transparent_data_encryption_options:
+#     enabled: false
+#     cipher: AES/CBC/PKCS5Padding
+#     key_alias: hcd_encryption_key
+
 # Snitch configuration for GossipingPropertyFileSnitch
 # Values are managed via /opt/hcd/resources/cassandra/conf/cassandra-rackdc.properties

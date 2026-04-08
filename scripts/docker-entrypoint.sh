@@ -16,11 +16,22 @@ export CASSANDRA_CLUSTER_NAME CASSANDRA_SEEDS CASSANDRA_LISTEN_ADDRESS CASSANDRA
 export CASSANDRA_CONF=${CASSANDRA_CONF:-/opt/hcd/resources/cassandra/conf}
 export HCD_CONF=${HCD_CONF:-/opt/hcd/resources/cassandra/conf}
 
+# Diagnostic trap: log useful info on unexpected failure
+on_error() {
+    echo "ERROR: Entrypoint failed at line $1. Environment:"
+    echo "  LISTEN_ADDRESS=${CASSANDRA_LISTEN_ADDRESS}"
+    echo "  SEEDS=${CASSANDRA_SEEDS}"
+    echo "  DC=${CASSANDRA_DC} RACK=${CASSANDRA_RACK}"
+    echo "  HEAP=${MAX_HEAP_SIZE:-unset}"
+}
+trap 'on_error $LINENO' ERR
+
 # Validate critical configuration
-if [ -z "${CASSANDRA_LISTEN_ADDRESS}" ] || [ "${CASSANDRA_LISTEN_ADDRESS}" = "127.0.0.1" ]; then
-    if [ "${CASSANDRA_LISTEN_ADDRESS}" = "127.0.0.1" ] && [ "${CASSANDRA_SEEDS}" != "127.0.0.1" ]; then
-        echo "WARNING: CASSANDRA_LISTEN_ADDRESS is 127.0.0.1 but seeds point elsewhere. Node will be unreachable by peers."
-    fi
+if [ "${CASSANDRA_LISTEN_ADDRESS}" = "127.0.0.1" ] && [ "${CASSANDRA_SEEDS}" != "127.0.0.1" ]; then
+    echo "ERROR: CASSANDRA_LISTEN_ADDRESS is 127.0.0.1 but seeds point to remote nodes."
+    echo "  This node will be unreachable by peers. Set CASSANDRA_LISTEN_ADDRESS to"
+    echo "  the node's container IP address (e.g., 172.28.0.X)."
+    exit 1
 fi
 
 # Validate heap size values (allow only digits followed by optional k/m/g suffix)

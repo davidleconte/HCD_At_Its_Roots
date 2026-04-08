@@ -2,7 +2,11 @@ FROM eclipse-temurin:11-jre
 
 LABEL maintainer="HCD Docker Cluster" \
       description="IBM HCD multi-node cluster for development and demos" \
-      version="1.2.3"
+      version="1.2.3" \
+      org.opencontainers.image.title="HCD Docker Cluster" \
+      org.opencontainers.image.description="IBM Hyperledger Cassandra Distribution - multi-node cluster for development, testing, and demos" \
+      org.opencontainers.image.vendor="IBM" \
+      org.opencontainers.image.source="https://github.com/davidleconte/HCD_At_Its_Roots"
 
 # Install dependencies:
 # - gettext-base for envsubst
@@ -86,5 +90,8 @@ ENV HEAP_NEWSIZE="100M"
 USER cassandra
 
 EXPOSE 9042 7000 7001 9404
+
+HEALTHCHECK --interval=30s --timeout=10s --retries=10 --start-period=180s \
+    CMD cqlsh -e 'SELECT release_version FROM system.local' || exit 1
 
 ENTRYPOINT ["/docker-entrypoint.sh"]

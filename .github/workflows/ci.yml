@@ -36,7 +36,7 @@ jobs:
       - name: Install test dependencies
         run: pip install pytest pytest-cov pyyaml
       - name: Run tests with coverage
-        run: pytest tests/ -v --cov=tests --cov-report=term-missing --cov-report=html:coverage-report
+        run: pytest tests/ -v --cov=scripts --cov=tests --cov-report=term-missing --cov-report=html:coverage-report --junitxml=test-results.xml
       - name: Upload coverage report
         if: always()
         uses: actions/upload-artifact@v4
@@ -44,12 +44,12 @@ jobs:
           name: coverage-report
           path: coverage-report/
           retention-days: 14
-      - name: Upload test results
+      - name: Upload test results (JUnit XML)
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: test-results
-          path: .pytest_cache/
+          path: test-results.xml
           retention-days: 14
 
   docker-validate:

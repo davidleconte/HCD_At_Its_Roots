@@ -6,7 +6,7 @@ EXPECTED_NODES ?= 6
 
 .DEFAULT_GOAL := help
 
-.PHONY: help build up down destroy restart status logs cqlsh demo demo-dry demo-full demo-score demo-ransomware demo-part minio minio-down test lint validate wait clean monitoring monitoring-down api api-down
+.PHONY: help build up down destroy restart status logs cqlsh demo demo-dry demo-full demo-score demo-ransomware demo-part minio minio-down check-prereqs test lint validate wait clean monitoring monitoring-down api api-down
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -85,6 +85,18 @@ monitoring: ## Start Prometheus + Grafana (http://localhost:3000)
 
 monitoring-down: ## Stop Prometheus + Grafana
 	$(COMPOSE) --profile monitoring down
+
+check-prereqs: ## Verify all prerequisites are installed
+	@echo "Checking prerequisites..."
+	@command -v docker >/dev/null 2>&1 && echo "  [OK] docker $$(docker --version | cut -d' ' -f3 | tr -d ',')" || echo "  [MISSING] docker"
+	@docker compose version >/dev/null 2>&1 && echo "  [OK] docker compose $$(docker compose version --short 2>/dev/null || echo 'v2')" || \
+		(command -v docker-compose >/dev/null 2>&1 && echo "  [OK] docker-compose (v1)" || echo "  [MISSING] docker compose")
+	@command -v python3 >/dev/null 2>&1 && echo "  [OK] python3 $$(python3 --version | cut -d' ' -f2)" || echo "  [MISSING] python3"
+	@python3 -c "import pytest" 2>/dev/null && echo "  [OK] pytest" || echo "  [MISSING] pytest (pip install pytest)"
+	@python3 -c "import yaml" 2>/dev/null && echo "  [OK] pyyaml" || echo "  [MISSING] pyyaml (pip install pyyaml)"
+	@command -v shellcheck >/dev/null 2>&1 && echo "  [OK] shellcheck" || echo "  [OPTIONAL] shellcheck (for linting)"
+	@command -v ruff >/dev/null 2>&1 && echo "  [OK] ruff" || echo "  [OPTIONAL] ruff (for Python linting)"
+	@test -f hcd-1.2.3-bin.tar.gz && echo "  [OK] hcd-1.2.3-bin.tar.gz" || echo "  [MISSING] hcd-1.2.3-bin.tar.gz (place in project root)"
 
 test: ## Run all pytest tests
 	pytest tests/ -v
