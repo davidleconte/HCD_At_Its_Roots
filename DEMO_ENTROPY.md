@@ -380,9 +380,9 @@ CL defines how many replicas must acknowledge a read or write for it to be consi
 | Level | Nodes Required | Latency | Availability | Use Case |
 |-------|----------------|---------|--------------|----------|
 | **ONE** | 1 | Lowest | Highest | Logging, IoT telemetry |
-| **QUORUM** | (RF/2)+1 total | Medium | Balanced | General purpose |
-| **LOCAL_QUORUM** | (RF/2)+1 in local DC | Low (No WAN) | High | Most multi-DC apps |
-| **EACH_QUORUM** | (RF/2)+1 in EVERY DC | High (WAN) | Lower | Critical global sync |
+| **QUORUM** | floor(RF/2)+1 total | Medium | Balanced | General purpose |
+| **LOCAL_QUORUM** | floor(RF/2)+1 in local DC | Low (No WAN) | High | Most multi-DC apps |
+| **EACH_QUORUM** | floor(RF/2)+1 in EVERY DC | High (WAN) | Lower | Critical global sync |
 
 **What to look for:** ONE, LOCAL_QUORUM, QUORUM succeed even with a node down. EACH_QUORUM fails because the downed dc1 node cannot provide its quorum share. After restarting the node, EACH_QUORUM is re-tested to prove recovery.
 

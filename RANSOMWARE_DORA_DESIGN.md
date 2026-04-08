@@ -845,9 +845,9 @@ DORA (Regulation 2022/2554) applies to all EU financial entities since **17 Janu
 
 ## 10. Demo Implementation Plan
 
-### 10.1 Proposed New Modules
+### 10.1 Implemented Modules
 
-The ransomware resilience demo should be implemented as **Part 9** of the existing demo, adding **7 new modules (72-78)** that build on existing capabilities and tie them to DORA compliance.
+The ransomware resilience demo is **Part 9** of the existing demo, comprising **7 modules (72-78)** that build on existing capabilities and tie them to DORA compliance.
 
 | Module | Title | Coverage | Duration | Key Proof |
 |--------|-------|----------|----------|-----------|

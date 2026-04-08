@@ -145,7 +145,7 @@ MODULE_CONTENT_EXPECTATIONS = [
     ("34", ["conflict", "multi-dc", "timestamp"]),
     ("35", ["rebuild", "datacenter"]),
     ("36", ["snapshot", "backup"]),
-    ("37", ["rolling", "restart", "drain"]),
+    ("37", ["rolling", "restart", "seed"]),
     ("38", ["thread", "tpstats", "pool"]),
     ("39", ["repair"]),
     ("40", ["stress", "bloom", "insert"]),

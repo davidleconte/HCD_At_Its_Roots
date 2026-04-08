@@ -70,6 +70,7 @@ trap cleanup INT TERM EXIT
 
 log_info() { echo -e "${C_BLUE}[INFO]${C_RESET} $1"; }
 log_cmd() {
+    # shellcheck disable=SC2086
     # Executes the command string via bash -c for shell interpretation (pipes,
     # redirections, etc.). All command strings are hardcoded in this script —
     # no user-controlled input is ever passed to this function.
